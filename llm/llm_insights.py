@@ -1,16 +1,17 @@
 import openai
-from config import OPENAI_API_KEY
+from config import get_openai_api_key
 import streamlit as st
 from typing import List, Dict, Any
 import json
 
 class LLMInsights:
     def __init__(self):
-        if not OPENAI_API_KEY:
+        openai_api_key = get_openai_api_key()
+        if not openai_api_key:
             st.warning("OpenAI API key not found. LLM features will be disabled.")
             self.enabled = False
         else:
-            openai.api_key = OPENAI_API_KEY
+            openai.api_key = openai_api_key
             self.enabled = True
     
     def generate_financial_insights(self, property_data: Dict[str, Any], financial_summary: Dict[str, Any]) -> str:

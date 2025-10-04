@@ -61,11 +61,18 @@ STREAMLIT_SERVER_PORT=8501
 
 ### 4. Run the Application
 
+**Local Development:**
 ```bash
 streamlit run app_auth.py
 ```
 
-The application will be available at `http://localhost:8501`
+**Streamlit Cloud Deployment:**
+1. Push your code to GitHub
+2. Deploy to [Streamlit Cloud](https://share.streamlit.io)
+3. Configure secrets in the Streamlit Cloud interface
+4. See [STREAMLIT_DEPLOYMENT.md](STREAMLIT_DEPLOYMENT.md) for detailed instructions
+
+The application will be available at `http://localhost:8501` (local) or your Streamlit Cloud URL
 
 ## Project Structure
 

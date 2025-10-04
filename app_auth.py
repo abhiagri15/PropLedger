@@ -817,13 +817,14 @@ def show_main_app():
         
         st.info(f"Tracking income for: **{org_name}**")
         
+        # Get properties for this organization (used in both tabs)
+        properties = db.get_properties()
+        org_properties = [p for p in properties if p.organization_id == selected_org_id]
+        
         # Tabs for income management
         tab1, tab2 = st.tabs(["View Income", "Add Income"])
         
         with tab1:
-            properties = db.get_properties()
-            # Filter properties by organization
-            org_properties = [p for p in properties if p.organization_id == selected_org_id]
             
             if org_properties:
                 # Filter by property
@@ -861,10 +862,6 @@ def show_main_app():
                 st.info(f"No properties found for {org_name}. Please add a property first.")
         
         with tab2:
-            properties = db.get_properties()
-            # Filter properties by organization
-            org_properties = [p for p in properties if p.organization_id == selected_org_id]
-            
             if org_properties:
                 st.subheader("Add New Income Record")
                 
@@ -950,13 +947,14 @@ def show_main_app():
         
         st.info(f"Tracking expenses for: **{org_name}**")
         
+        # Get properties for this organization (used in both tabs)
+        properties = db.get_properties()
+        org_properties = [p for p in properties if p.organization_id == selected_org_id]
+        
         # Tabs for expense management
         tab1, tab2 = st.tabs(["View Expenses", "Add Expense"])
         
         with tab1:
-            properties = db.get_properties()
-            # Filter properties by organization
-            org_properties = [p for p in properties if p.organization_id == selected_org_id]
             
             if org_properties:
                 # Filter by property
@@ -994,10 +992,6 @@ def show_main_app():
                 st.info(f"No properties found for {org_name}. Please add a property first.")
         
         with tab2:
-            properties = db.get_properties()
-            # Filter properties by organization
-            org_properties = [p for p in properties if p.organization_id == selected_org_id]
-            
             if org_properties:
                 st.subheader("Add New Expense Record")
                 

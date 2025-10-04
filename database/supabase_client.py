@@ -1,15 +1,18 @@
 from supabase import create_client, Client
-from config import SUPABASE_URL, SUPABASE_KEY
+from config import get_supabase_url, get_supabase_key
 import streamlit as st
 
 @st.cache_resource
 def get_supabase_client() -> Client:
     """Initialize and return Supabase client"""
-    if not SUPABASE_URL or not SUPABASE_KEY:
+    supabase_url = get_supabase_url()
+    supabase_key = get_supabase_key()
+    
+    if not supabase_url or not supabase_key:
         st.error("Please set SUPABASE_URL and SUPABASE_KEY in your environment variables")
         st.stop()
     
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+    return create_client(supabase_url, supabase_key)
 
 def test_connection():
     """Test Supabase connection"""
