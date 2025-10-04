@@ -189,6 +189,8 @@ def show_auth_page():
                                         }).execute()
                                         
                                         if user_org_response.data:
+                                            # Set the created organization as selected
+                                            st.session_state.selected_organization = org_id
                                             st.success("✅ Account and organization created successfully! Please check your email to verify your account.")
                                             st.info("📧 A verification email has been sent to your email address.")
                                         else:
@@ -268,10 +270,20 @@ def show_main_app():
                     if 'selected_organization' not in st.session_state:
                         st.session_state.selected_organization = organizations[0].id
                     
+                    # Find the index of the selected organization
+                    selected_index = 0
+                    if st.session_state.selected_organization:
+                        try:
+                            selected_org_name = next(org.name for org in organizations if org.id == st.session_state.selected_organization)
+                            selected_index = org_names.index(selected_org_name)
+                        except (StopIteration, ValueError):
+                            # If selected organization not found, default to first one
+                            selected_index = 0
+                    
                     selected_org_name = st.selectbox(
                         "Organization",
                         options=org_names,
-                        index=org_names.index(next(org.name for org in organizations if org.id == st.session_state.selected_organization)) if st.session_state.selected_organization else 0
+                        index=selected_index
                     )
                     
                     # Update selected organization
@@ -281,6 +293,9 @@ def show_main_app():
                             break
                 else:
                     st.warning("No organizations found")
+                    # Clear selected organization if user has no organizations
+                    if 'selected_organization' in st.session_state:
+                        del st.session_state.selected_organization
         
         # Authentication status - Compact
         if st.session_state.user:
