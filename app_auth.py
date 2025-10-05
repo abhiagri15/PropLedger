@@ -1831,8 +1831,20 @@ def show_main_app():
         with col1:
             if st.button("🔄 Create Monthly Reminders", type="primary"):
                 with st.spinner("Creating reminders for all properties..."):
+                    # Get user ID from session state user object
+                    user_id = None
+                    if st.session_state.user:
+                        if hasattr(st.session_state.user, 'id'):
+                            user_id = st.session_state.user.id
+                        elif isinstance(st.session_state.user, dict):
+                            user_id = st.session_state.user.get('id')
+                    
+                    if not user_id:
+                        st.error("Unable to get user ID. Please log out and log back in.")
+                        return
+                    
                     created_count = reminder_service.create_monthly_reminders(
-                        selected_org_id, st.session_state.user_id
+                        selected_org_id, user_id
                     )
                     if created_count > 0:
                         st.success(f"Created {created_count} new reminders for this month!")
@@ -2407,8 +2419,105 @@ def show_main_app():
                             # Explicitly drop any id column if present
                             if 'id' in df.columns:
                                 df = df.drop(columns=['id'])
+                            
+                            # Add Total row
+                            total_amount = df['Amount'].sum()
+                            total_row = pd.DataFrame({
+                                'S.No.': [''],
+                                'Date': [''],
+                                'Type': [''],
+                                'Property': [''],
+                                'Description': ['**TOTAL**'],
+                                'Amount': [total_amount]
+                            })
+                            df_with_total = pd.concat([df, total_row], ignore_index=True)
+                            
                             st.markdown(f"#### {org_name_txn} — {txn_period_text}")
-                            st.dataframe(df, use_container_width=True, hide_index=True)
+                            st.dataframe(df_with_total, use_container_width=True, hide_index=True)
+                            
+                            # Download buttons for Transactions Report
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                # PDF Download
+                                if st.button("📄 Download PDF", key="download_txn_pdf"):
+                                    try:
+                                        from reportlab.lib.pagesizes import letter
+                                        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+                                        from reportlab.lib.styles import getSampleStyleSheet
+                                        from reportlab.lib import colors
+                                        import io
+                                        import base64
+                                        
+                                        buffer = io.BytesIO()
+                                        doc = SimpleDocTemplate(buffer, pagesize=letter)
+                                        story = []
+                                        styles = getSampleStyleSheet()
+                                        
+                                        # Title
+                                        title = Paragraph(f"<b>Transactions Report - {org_name_txn}</b>", styles['Title'])
+                                        story.append(title)
+                                        story.append(Spacer(1, 12))
+                                        
+                                        # Period
+                                        period = Paragraph(f"<b>Period:</b> {txn_period_text}", styles['Normal'])
+                                        story.append(period)
+                                        story.append(Spacer(1, 12))
+                                        
+                                        # Convert dataframe to table data
+                                        table_data = [df_with_total.columns.tolist()]
+                                        for _, row in df_with_total.iterrows():
+                                            table_data.append(row.tolist())
+                                        
+                                        # Create table
+                                        table = Table(table_data)
+                                        table.setStyle(TableStyle([
+                                            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                                            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                                            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                                            ('FONTSIZE', (0, 0), (-1, 0), 12),
+                                            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                                            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                                            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                                        ]))
+                                        
+                                        story.append(table)
+                                        doc.build(story)
+                                        
+                                        buffer.seek(0)
+                                        b64 = base64.b64encode(buffer.getvalue()).decode()
+                                        filename = f"{org_name_txn.replace(' ', '_')}_Transactions_{txn_period_text.replace(' ', '_').replace(':', '')}.pdf"
+                                        st.markdown(f'<a href="data:application/pdf;base64,{b64}" download="{filename}">📄 Click to download PDF</a>', unsafe_allow_html=True)
+                                        
+                                    except Exception as e:
+                                        st.error(f"Error generating PDF: {str(e)}")
+                            
+                            with col2:
+                                # Excel Download
+                                if st.button("📊 Download Excel", key="download_txn_excel"):
+                                    try:
+                                        import io
+                                        output = io.BytesIO()
+                                        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                                            # Summary sheet
+                                            summary_data = pd.DataFrame([
+                                                ['Total Transactions', len(df)],
+                                                ['Total Amount', f"${total_amount:,.2f}"],
+                                                ['Period', txn_period_text]
+                                            ], columns=['Metric', 'Value'])
+                                            summary_data.to_excel(writer, sheet_name='Summary', index=False)
+                                            
+                                            # Transactions sheet
+                                            df_with_total.to_excel(writer, sheet_name='Transactions', index=False)
+                                        
+                                        output.seek(0)
+                                        b64 = base64.b64encode(output.getvalue()).decode()
+                                        filename = f"{org_name_txn.replace(' ', '_')}_Transactions_{txn_period_text.replace(' ', '_').replace(':', '')}.xlsx"
+                                        st.markdown(f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" download="{filename}">📊 Click to download Excel</a>', unsafe_allow_html=True)
+                                        
+                                    except Exception as e:
+                                        st.error(f"Error generating Excel: {str(e)}")
                         else:
                             st.info("No transactions found for the selected criteria.")
                     except Exception as e:
