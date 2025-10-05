@@ -8,6 +8,7 @@ from database.supabase_client import get_supabase_client
 from database.database_operations import DatabaseOperations
 from database.models import Property, Income, Expense, PropertyType, IncomeType, ExpenseType, Organization, UserOrganization
 from llm.llm_insights import LLMInsights
+from services.geocoding import geocoding_service
 import config
 import os
 from dotenv import load_dotenv
@@ -46,6 +47,31 @@ st.markdown("""
         background-color: #d4edda;
         border: 1px solid #c3e6cb;
         border-radius: 0.5rem;
+    }
+    .address-suggestion {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        padding: 0.5rem;
+        margin: 0.25rem 0;
+        transition: all 0.2s ease;
+    }
+    .address-suggestion:hover {
+        background-color: #e9ecef;
+        border-color: #1f77b4;
+    }
+    .map-link {
+        color: #1f77b4;
+        text-decoration: none;
+        font-size: 0.875rem;
+    }
+    .map-link:hover {
+        text-decoration: underline;
+    }
+    .location-preview {
+        background-color: #e7f3ff;
+        border: 1px solid #b3d9ff;
+        border-radius: 0.375rem;
         padding: 1rem;
         margin: 1rem 0;
     }
@@ -333,35 +359,202 @@ def show_main_app():
     if selected == "Organizations Dashboard":
         st.markdown('<h1 class="main-header">🏢 Organizations Dashboard</h1>', unsafe_allow_html=True)
         
-        # Get user organizations
+        # Check if demo mode
+        is_demo_mode = False
         if st.session_state.user:
-            if hasattr(st.session_state.user, 'id'):
-                user_id = st.session_state.user.id
+            if hasattr(st.session_state.user, 'email'):
+                is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
             else:
-                user_id = st.session_state.user.get('id', None)
+                is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
+        
+        if is_demo_mode:
+            # Demo mode - show sample organizations
+            st.markdown('<div class="info-box">🎯 <strong>Demo Mode</strong> - Showing sample organizations. Sign up to manage your own organizations!</div>', unsafe_allow_html=True)
             
-            if user_id:
-                db = DatabaseOperations()
-                organizations = db.get_user_organizations(user_id)
-                
-                if organizations:
-                    # Display organizations
-                    st.markdown("### Your Organizations")
+            # Sample organizations for demo
+            demo_organizations = [
+                {
+                    'name': 'Demo Property Group',
+                    'description': 'Sample property management company',
+                    'created_at': '2024-01-15',
+                    'properties': 3,
+                    'total_value': 750000,
+                    'monthly_rent': 4500,
+                    'total_income': 54000,
+                    'total_expenses': 24000,
+                    'net_income': 30000
+                },
+                {
+                    'name': 'Sample Real Estate LLC',
+                    'description': 'Demo real estate investment company',
+                    'created_at': '2024-02-20',
+                    'properties': 2,
+                    'total_value': 500000,
+                    'monthly_rent': 3200,
+                    'total_income': 38400,
+                    'total_expenses': 18000,
+                    'net_income': 20400
+                }
+            ]
+            
+            st.markdown("### Sample Organizations")
+            
+            for org in demo_organizations:
+                with st.expander(f"🏢 {org['name']}", expanded=True):
+                    col1, col2 = st.columns(2)
                     
-                    for org in organizations:
-                        with st.expander(f"🏢 {org.name}", expanded=True):
-                            col1, col2 = st.columns(2)
-                            
-                            with col1:
-                                st.markdown(f"**Description:** {org.description or 'No description provided'}")
-                                st.markdown(f"**Created:** {org.created_at.strftime('%Y-%m-%d') if org.created_at else 'Unknown'}")
-                            
-                            with col2:
-                                # Get organization stats
-                                properties = db.get_properties()
-                                org_properties = [p for p in properties if p.organization_id == org.id]
+                    with col1:
+                        st.markdown(f"**Description:** {org['description']}")
+                        st.markdown(f"**Created:** {org['created_at']}")
+                    
+                    with col2:
+                        st.metric("Properties", org['properties'])
+                        st.metric("Total Value", f"${org['total_value']:,.2f}")
+                        st.metric("Monthly Rent", f"${org['monthly_rent']:,.2f}")
+                        
+                        # P&L Summary
+                        st.markdown("**Financial Summary:**")
+                        col_a, col_b, col_c = st.columns(3)
+                        with col_a:
+                            st.metric("Total Income", f"${org['total_income']:,.2f}")
+                        with col_b:
+                            st.metric("Total Expenses", f"${org['total_expenses']:,.2f}")
+                        with col_c:
+                            st.metric("Net Income", f"${org['net_income']:,.2f}")
+                        
+                        # Profit margin
+                        profit_margin = (org['net_income'] / org['total_income'] * 100) if org['total_income'] > 0 else 0
+                        st.metric("Profit Margin", f"{profit_margin:.1f}%")
+            
+            # Demo organization creation
+            st.markdown("---")
+            st.markdown("### Create New Organization (Demo)")
+            
+            with st.form("demo_org_form_1"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    demo_org_name_1 = st.text_input("Organization Name", value="My Demo Company", key="demo_org_name_1")
+                    demo_org_desc_1 = st.text_area("Description", value="A sample organization for demonstration", key="demo_org_desc_1")
+                
+                with col2:
+                    st.info("**Demo Note:** This is a demonstration. In the real app, this would create an actual organization in your database.")
+                
+                if st.form_submit_button("Create Demo Organization", type="primary"):
+                    st.success(f"Demo organization '{demo_org_name_1}' would be created!")
+                    st.info("Sign up to create real organizations and manage your properties!")
+        
+        else:
+            # Real mode - show message for now
+            st.info("Real organization management - Sign up to use with your own data!")
+        
+        if is_demo_mode:
+            # Demo mode - show sample organizations
+            st.markdown('<div class="info-box">🎯 <strong>Demo Mode</strong> - Showing sample organizations. Sign up to manage your own organizations!</div>', unsafe_allow_html=True)
+            
+            # Sample organizations for demo
+            demo_organizations = [
+                {
+                    'name': 'Demo Property Group',
+                    'description': 'Sample property management company',
+                    'created_at': '2024-01-15',
+                    'properties': 3,
+                    'total_value': 750000,
+                    'monthly_rent': 4500,
+                    'total_income': 54000,
+                    'total_expenses': 24000,
+                    'net_income': 30000
+                },
+                {
+                    'name': 'Sample Real Estate LLC',
+                    'description': 'Demo real estate investment company',
+                    'created_at': '2024-02-20',
+                    'properties': 2,
+                    'total_value': 500000,
+                    'monthly_rent': 3200,
+                    'total_income': 38400,
+                    'total_expenses': 18000,
+                    'net_income': 20400
+                }
+            ]
+            
+            st.markdown("### Sample Organizations")
+            
+            for org in demo_organizations:
+                with st.expander(f"🏢 {org['name']}", expanded=True):
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown(f"**Description:** {org['description']}")
+                        st.markdown(f"**Created:** {org['created_at']}")
+                    
+                    with col2:
+                        st.metric("Properties", org['properties'])
+                        st.metric("Total Value", f"${org['total_value']:,.2f}")
+                        st.metric("Monthly Rent", f"${org['monthly_rent']:,.2f}")
+                        
+                        # P&L Summary
+                        st.markdown("**Financial Summary:**")
+                        col_a, col_b, col_c = st.columns(3)
+                        with col_a:
+                            st.metric("Total Income", f"${org['total_income']:,.2f}")
+                        with col_b:
+                            st.metric("Total Expenses", f"${org['total_expenses']:,.2f}")
+                        with col_c:
+                            st.metric("Net Income", f"${org['net_income']:,.2f}")
+                        
+                        # Profit margin
+                        profit_margin = (org['net_income'] / org['total_income'] * 100) if org['total_income'] > 0 else 0
+                        st.metric("Profit Margin", f"{profit_margin:.1f}%")
+            
+            # Demo organization creation
+            st.markdown("---")
+            st.markdown("### Create New Organization (Demo)")
+            
+            with st.form("demo_org_form_1"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    demo_org_name_1 = st.text_input("Organization Name", value="My Demo Company", key="demo_org_name_1")
+                    demo_org_desc_1 = st.text_area("Description", value="A sample organization for demonstration", key="demo_org_desc_1")
+                
+                with col2:
+                    st.info("**Demo Note:** This is a demonstration. In the real app, this would create an actual organization in your database.")
+                
+                if st.form_submit_button("Create Demo Organization", type="primary"):
+                    st.success(f"Demo organization '{demo_org_name_1}' would be created!")
+                    st.info("Sign up to create real organizations and manage your properties!")
+        
+        else:
+            # Real mode - get user organizations
+            if st.session_state.user:
+                if hasattr(st.session_state.user, 'id'):
+                    user_id = st.session_state.user.id
+                else:
+                    user_id = st.session_state.user.get('id', None)
+                
+                if user_id:
+                    db = DatabaseOperations()
+                    organizations = db.get_user_organizations(user_id)
+                    
+                    if organizations:
+                        # Display organizations
+                        st.markdown("### Your Organizations")
+                        
+                        for org in organizations:
+                            with st.expander(f"🏢 {org.name}", expanded=True):
+                                col1, col2 = st.columns(2)
                                 
-                                st.metric("Properties", len(org_properties))
+                                with col1:
+                                    st.markdown(f"**Description:** {org.description or 'No description provided'}")
+                                    st.markdown(f"**Created:** {org.created_at.strftime('%Y-%m-%d') if org.created_at else 'Unknown'}")
+                                
+                                with col2:
+                                    # Get organization stats
+                                    properties = db.get_properties()
+                                    org_properties = [p for p in properties if p.organization_id == org.id]
+                                    
+                                    st.metric("Properties", len(org_properties))
                                 
                                 if org_properties:
                                     total_value = sum(p.purchase_price for p in org_properties)
@@ -453,8 +646,6 @@ def show_main_app():
                                 st.error("Failed to create organization. Please try again.")
             else:
                 st.error("Unable to get user ID. Please log out and log back in.")
-        else:
-            st.error("Please log in to view organizations.")
     
     elif selected == "Dashboard":
         st.markdown('<h1 class="main-header">🏠 PropLedger Dashboard</h1>', unsafe_allow_html=True)
@@ -761,6 +952,77 @@ def show_main_app():
             with tab2:
                 st.subheader("Add New Property")
                 
+                # Address input section (outside form for suggestions)
+                st.markdown("### Property Details")
+                
+                # Address search input
+                address_search_key = f"address_search_{st.session_state.get('form_reset_counter', 0)}"
+                address_search = st.text_input(
+                    "Search Address *", 
+                    placeholder="Start typing address... (e.g., 123 Main St, New York)",
+                    key=address_search_key
+                )
+                
+                # Address suggestions using selectbox
+                selected_address = None
+                if address_search and len(address_search.strip()) >= 3:
+                    try:
+                        suggestions = geocoding_service.search_addresses(address_search.strip(), limit=10)
+                        
+                        if suggestions:
+                            st.markdown("**Select Address:**")
+                            suggestion_options = [f"📍 {s['address']}" for s in suggestions]
+                            suggestion_index = st.selectbox(
+                                "Choose from suggestions:",
+                                options=range(len(suggestion_options)),
+                                format_func=lambda x: suggestion_options[x] if x < len(suggestion_options) else "",
+                                key=f"address_select_{st.session_state.get('form_reset_counter', 0)}"
+                            )
+                            
+                            if suggestion_index is not None and suggestion_index < len(suggestions):
+                                selected_suggestion = suggestions[suggestion_index]
+                                selected_address = selected_suggestion['address']
+                                
+                                # Show map link for selected address
+                                if selected_suggestion.get('lat') and selected_suggestion.get('lon'):
+                                    map_url = f"https://www.google.com/maps?q={selected_suggestion['lat']},{selected_suggestion['lon']}"
+                                    st.markdown(f'<a href="{map_url}" class="map-link" target="_blank">🗺️ View on Map</a>', unsafe_allow_html=True)
+                        else:
+                            st.info("No address suggestions found. You can enter manually below.")
+                    except Exception as e:
+                        st.warning(f"Address lookup temporarily unavailable: {str(e)}")
+                
+                # Manual address input
+                st.markdown("**Or enter address manually:**")
+                address_input_key = f"address_input_{st.session_state.get('form_reset_counter', 0)}"
+                manual_address = st.text_input(
+                    "Address *", 
+                    value=selected_address if selected_address else "",
+                    placeholder="Enter complete address manually",
+                    key=address_input_key
+                )
+                
+                # Use selected address or manual address
+                final_address = selected_address if selected_address else manual_address
+                
+                # Show map preview for final address
+                if final_address and len(final_address.strip()) >= 10:
+                    try:
+                        address_details = geocoding_service.get_address_details(final_address.strip())
+                        if address_details:
+                            st.markdown("**📍 Location Preview:**")
+                            st.markdown(f'<div class="location-preview">', unsafe_allow_html=True)
+                            col1, col2 = st.columns([3, 1])
+                            with col1:
+                                st.info(f"Coordinates: {address_details['lat']:.6f}, {address_details['lon']:.6f}")
+                            with col2:
+                                st.markdown(f'<a href="{address_details["map_url"]}" class="map-link" target="_blank">🗺️ View on Map</a>', unsafe_allow_html=True)
+                            st.markdown('</div>', unsafe_allow_html=True)
+                    except Exception as e:
+                        pass  # Silently fail for map preview
+                
+                st.markdown("---")
+                
                 # Use a key to reset form after successful submission
                 form_key = f"add_property_form_{st.session_state.get('form_reset_counter', 0)}"
                 
@@ -769,7 +1031,6 @@ def show_main_app():
                     
                     with col1:
                         name = st.text_input("Property Name *", placeholder="e.g., Downtown Apartment")
-                        address = st.text_area("Address *", placeholder="123 Main St, City, State")
                         property_type = st.selectbox("Property Type *", [pt.value for pt in PropertyType])
                         purchase_price = st.number_input("Purchase Price *", min_value=0.0, format="%.2f")
                     
@@ -781,10 +1042,11 @@ def show_main_app():
                     submitted = st.form_submit_button("Add Property", type="primary")
                     
                     if submitted:
-                        if name and address and purchase_price and monthly_rent:
+                        # Get address from final_address (selected or manual)
+                        if name and final_address and purchase_price and monthly_rent:
                             new_property = Property(
                                 name=name,
-                                address=address,
+                                address=final_address,
                                 property_type=PropertyType(property_type),
                                 purchase_price=purchase_price,
                                 purchase_date=datetime.combine(purchase_date, datetime.min.time()),
@@ -819,6 +1081,53 @@ def show_main_app():
     # For brevity, I'll add a placeholder for now
     elif selected == "Income":
         st.markdown('<h1 class="main-header">💰 Income Tracking</h1>', unsafe_allow_html=True)
+        
+        # Check if demo mode
+        is_demo_mode = False
+        if st.session_state.user:
+            if hasattr(st.session_state.user, 'email'):
+                is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
+            else:
+                is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
+        
+        if is_demo_mode:
+            # Demo mode - show sample income data
+            st.markdown('<div class="info-box">🎯 <strong>Demo Mode</strong> - Showing sample income data. Sign up to manage your own income!</div>', unsafe_allow_html=True)
+            
+            # Sample income data for demo
+            demo_income = [
+                {'property': 'Downtown Apartment', 'amount': 1800, 'type': 'Rent', 'date': '2024-01-15'},
+                {'property': 'Suburban House', 'amount': 2200, 'type': 'Rent', 'date': '2024-01-20'},
+                {'property': 'Commercial Space', 'amount': 500, 'type': 'Parking', 'date': '2024-01-25'},
+                {'property': 'Downtown Apartment', 'amount': 1800, 'type': 'Rent', 'date': '2024-02-15'},
+                {'property': 'Suburban House', 'amount': 2200, 'type': 'Rent', 'date': '2024-02-20'},
+            ]
+            
+            # Display demo income data
+            st.markdown("### Sample Income Records")
+            for inc in demo_income:
+                st.write(f"• {inc['property']}: ${inc['amount']:,.2f} - {inc['type']} ({inc['date']})")
+            
+            # Demo income form
+            st.markdown("---")
+            st.markdown("### Add Income Record (Demo)")
+            
+            with st.form("demo_income_form"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    demo_property = st.selectbox("Property", ["Downtown Apartment", "Suburban House", "Commercial Space"], key="demo_property")
+                    demo_amount = st.number_input("Amount", value=1500, key="demo_amount")
+                    demo_type = st.selectbox("Income Type", ["Rent", "Parking", "Laundry", "Other"], key="demo_type")
+                
+                with col2:
+                    demo_date = st.date_input("Date", value=date.today(), key="demo_date")
+                    demo_description = st.text_area("Description", value="Sample income record", key="demo_description")
+                
+                if st.form_submit_button("Add Demo Income", type="primary"):
+                    st.success(f"Demo income record added: ${demo_amount:,.2f} for {demo_property}")
+                    st.info("Sign up to add real income records!")
+            return
         
         # Get selected organization
         selected_org_id = st.session_state.get('selected_organization')
@@ -950,6 +1259,53 @@ def show_main_app():
     elif selected == "Expenses":
         st.markdown('<h1 class="main-header">💸 Expense Tracking</h1>', unsafe_allow_html=True)
         
+        # Check if demo mode
+        is_demo_mode = False
+        if st.session_state.user:
+            if hasattr(st.session_state.user, 'email'):
+                is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
+            else:
+                is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
+        
+        if is_demo_mode:
+            # Demo mode - show sample expense data
+            st.markdown('<div class="info-box">🎯 <strong>Demo Mode</strong> - Showing sample expense data. Sign up to manage your own expenses!</div>', unsafe_allow_html=True)
+            
+            # Sample expense data for demo
+            demo_expenses = [
+                {'property': 'Downtown Apartment', 'amount': 150, 'type': 'Maintenance', 'date': '2024-01-10'},
+                {'property': 'Suburban House', 'amount': 200, 'type': 'Utilities', 'date': '2024-01-15'},
+                {'property': 'Commercial Space', 'amount': 300, 'type': 'Insurance', 'date': '2024-01-20'},
+                {'property': 'Downtown Apartment', 'amount': 1200, 'type': 'Mortgage', 'date': '2024-02-01'},
+                {'property': 'Suburban House', 'amount': 1800, 'type': 'Mortgage', 'date': '2024-02-01'},
+            ]
+            
+            # Display demo expense data
+            st.markdown("### Sample Expense Records")
+            for exp in demo_expenses:
+                st.write(f"• {exp['property']}: ${exp['amount']:,.2f} - {exp['type']} ({exp['date']})")
+            
+            # Demo expense form
+            st.markdown("---")
+            st.markdown("### Add Expense Record (Demo)")
+            
+            with st.form("demo_expense_form"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    demo_property = st.selectbox("Property", ["Downtown Apartment", "Suburban House", "Commercial Space"], key="demo_exp_property")
+                    demo_amount = st.number_input("Amount", value=200, key="demo_exp_amount")
+                    demo_type = st.selectbox("Expense Type", ["Maintenance", "Utilities", "Insurance", "Mortgage", "Taxes", "Other"], key="demo_exp_type")
+                
+                with col2:
+                    demo_date = st.date_input("Date", value=date.today(), key="demo_exp_date")
+                    demo_description = st.text_area("Description", value="Sample expense record", key="demo_exp_description")
+                
+                if st.form_submit_button("Add Demo Expense", type="primary"):
+                    st.success(f"Demo expense record added: ${demo_amount:,.2f} for {demo_property}")
+                    st.info("Sign up to add real expense records!")
+            return
+        
         # Get selected organization
         selected_org_id = st.session_state.get('selected_organization')
         if not selected_org_id:
@@ -1079,7 +1435,353 @@ def show_main_app():
     
     elif selected == "Analytics":
         st.markdown('<h1 class="main-header">📊 Analytics & Reports</h1>', unsafe_allow_html=True)
-        st.info("Analytics functionality - Sign up to use with your own data!")
+        
+        # Check if demo mode
+        is_demo_mode = False
+        if st.session_state.user:
+            if hasattr(st.session_state.user, 'email'):
+                is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
+            else:
+                is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
+        
+        if is_demo_mode:
+            # Demo mode - show sample analytics data
+            st.markdown('<div class="info-box">🎯 <strong>Demo Mode</strong> - Showing sample analytics data. Sign up to see your own analytics!</div>', unsafe_allow_html=True)
+            
+            # Demo financial overview
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Properties", "3", "1")
+            with col2:
+                st.metric("Monthly Revenue", "$4,500", "5.2%")
+            with col3:
+                st.metric("Total Expenses", "$2,100", "-2.1%")
+            with col4:
+                st.metric("Net Profit", "$2,400", "8.3%")
+            
+            st.markdown("---")
+            
+            # Demo charts
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("📈 Revenue Trend")
+                # Sample data for demo
+                dates = [datetime.now() - timedelta(days=30-i) for i in range(30)]
+                revenue = [4000 + i*20 + (i%7)*100 for i in range(30)]
+                
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=dates, y=revenue, mode='lines+markers', name='Revenue', line=dict(color='#2E8B57')))
+                fig.update_layout(title="Monthly Revenue Trend", xaxis_title="Date", yaxis_title="Revenue ($)")
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                st.subheader("🏠 Property Performance")
+                # Sample property data
+                properties = ['Downtown Apt', 'Suburban House', 'Commercial Space']
+                income = [1800, 2200, 500]
+                expenses = [800, 1200, 200]
+                
+                fig = go.Figure()
+                fig.add_trace(go.Bar(name='Income', x=properties, y=income, marker_color='#2E8B57'))
+                fig.add_trace(go.Bar(name='Expenses', x=properties, y=expenses, marker_color='#DC143C'))
+                fig.update_layout(title="Property Income vs Expenses", barmode='group')
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Demo expense breakdown
+            st.subheader("💰 Expense Breakdown")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Pie chart for expense categories
+                categories = ['Maintenance', 'Utilities', 'Insurance', 'Taxes', 'Other']
+                amounts = [800, 600, 400, 200, 100]
+                
+                fig = go.Figure(data=[go.Pie(labels=categories, values=amounts, hole=0.3)])
+                fig.update_layout(title="Expense Categories")
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                # Monthly expense trend
+                months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
+                monthly_expenses = [1800, 1900, 2100, 2000, 2200, 2100]
+                
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=months, y=monthly_expenses, mode='lines+markers', 
+                                       name='Monthly Expenses', line=dict(color='#DC143C')))
+                fig.update_layout(title="Monthly Expense Trend", xaxis_title="Month", yaxis_title="Expenses ($)")
+                st.plotly_chart(fig, use_container_width=True)
+            return
+        
+        # Get selected organization
+        selected_org_id = st.session_state.get('selected_organization')
+        if not selected_org_id:
+            st.error("Please select an organization first.")
+            return
+        
+        # Get organization name
+        db = DatabaseOperations()
+        org = db.get_organization_by_id(selected_org_id)
+        org_name = org.name if org else "Unknown Organization"
+        
+        # Check if demo mode
+        is_demo_mode = False
+        if st.session_state.user:
+            if hasattr(st.session_state.user, 'email'):
+                is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
+            else:
+                is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
+        
+        if is_demo_mode:
+            # Demo analytics with sample data
+            st.info("🎯 **DEMO MODE** - Showing sample analytics data")
+            
+            # Demo financial overview
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Properties", "3", "1")
+            with col2:
+                st.metric("Monthly Revenue", "$4,500", "5.2%")
+            with col3:
+                st.metric("Total Expenses", "$2,100", "-2.1%")
+            with col4:
+                st.metric("Net Profit", "$2,400", "8.3%")
+            
+            st.markdown("---")
+            
+            # Demo charts
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("📈 Revenue Trend")
+                # Sample data for demo
+                
+                dates = [datetime.now() - timedelta(days=30-i) for i in range(30)]
+                revenue = [4000 + i*20 + (i%7)*100 for i in range(30)]
+                
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=dates, y=revenue, mode='lines+markers', name='Revenue', line=dict(color='#2E8B57')))
+                fig.update_layout(title="Monthly Revenue Trend", xaxis_title="Date", yaxis_title="Revenue ($)")
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                st.subheader("🏠 Property Performance")
+                # Sample property data
+                properties = ['Downtown Apt', 'Suburban House', 'Commercial Space']
+                income = [1800, 2200, 500]
+                expenses = [800, 1200, 200]
+                
+                fig = go.Figure()
+                fig.add_trace(go.Bar(name='Income', x=properties, y=income, marker_color='#2E8B57'))
+                fig.add_trace(go.Bar(name='Expenses', x=properties, y=expenses, marker_color='#DC143C'))
+                fig.update_layout(title="Property Income vs Expenses", barmode='group')
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Demo expense breakdown
+            st.subheader("💰 Expense Breakdown")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Pie chart for expense categories
+                categories = ['Maintenance', 'Utilities', 'Insurance', 'Taxes', 'Other']
+                amounts = [800, 600, 400, 200, 100]
+                
+                fig = go.Figure(data=[go.Pie(labels=categories, values=amounts, hole=0.3)])
+                fig.update_layout(title="Expense Categories")
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                # Monthly expense trend
+                months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
+                monthly_expenses = [1800, 1900, 2100, 2000, 2200, 2100]
+                
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=months, y=monthly_expenses, mode='lines+markers', 
+                                       name='Monthly Expenses', line=dict(color='#DC143C')))
+                fig.update_layout(title="Monthly Expense Trend", xaxis_title="Month", yaxis_title="Expenses ($)")
+                st.plotly_chart(fig, use_container_width=True)
+        
+        else:
+            # Real analytics with user data
+            # Get all data for the organization
+            properties = db.get_properties()
+            org_properties = [p for p in properties if p.organization_id == selected_org_id]
+            
+            if not org_properties:
+                st.info(f"No properties found for {org_name}. Add properties to see analytics.")
+                return
+            
+            # Get financial data
+            all_income = db.get_all_income()
+            all_expenses = db.get_all_expenses()
+            
+            # Filter by organization
+            org_income = [inc for inc in all_income if inc.organization_id == selected_org_id]
+            org_expenses = [exp for exp in all_expenses if exp.organization_id == selected_org_id]
+            
+            # Date range filter
+            st.subheader("📅 Date Range Filter")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                start_date = st.date_input("Start Date", value=date.today() - timedelta(days=365))
+            with col2:
+                end_date = st.date_input("End Date", value=date.today())
+            
+            # Filter data by date range
+            filtered_income = [inc for inc in org_income if start_date <= inc.transaction_date.date() <= end_date]
+            filtered_expenses = [exp for exp in org_expenses if start_date <= exp.transaction_date.date() <= end_date]
+            
+            # Financial Overview
+            st.subheader("💰 Financial Overview")
+            
+            total_income = sum(inc.amount for inc in filtered_income)
+            total_expenses = sum(exp.amount for exp in filtered_expenses)
+            net_income = total_income - total_expenses
+            profit_margin = (net_income / total_income * 100) if total_income > 0 else 0
+            
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Properties", len(org_properties))
+            with col2:
+                st.metric("Total Income", f"${total_income:,.2f}")
+            with col3:
+                st.metric("Total Expenses", f"${total_expenses:,.2f}")
+            with col4:
+                st.metric("Net Income", f"${net_income:,.2f}", f"{profit_margin:.1f}%")
+            
+            st.markdown("---")
+            
+            # Charts
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("📈 Income Trend")
+                if filtered_income:
+                    # Group income by month
+                    income_by_month = {}
+                    for inc in filtered_income:
+                        month_key = inc.transaction_date.strftime('%Y-%m')
+                        if month_key not in income_by_month:
+                            income_by_month[month_key] = 0
+                        income_by_month[month_key] += inc.amount
+                    
+                    months = sorted(income_by_month.keys())
+                    amounts = [income_by_month[month] for month in months]
+                    
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=months, y=amounts, mode='lines+markers', 
+                                           name='Income', line=dict(color='#2E8B57')))
+                    fig.update_layout(title="Monthly Income Trend", xaxis_title="Month", yaxis_title="Income ($)")
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("No income data for selected period")
+            
+            with col2:
+                st.subheader("🏠 Property Performance")
+                if org_properties and filtered_income:
+                    property_income = {}
+                    property_expenses = {}
+                    
+                    # Calculate income per property
+                    for inc in filtered_income:
+                        prop_id = inc.property_id
+                        if prop_id not in property_income:
+                            property_income[prop_id] = 0
+                        property_income[prop_id] += inc.amount
+                    
+                    # Calculate expenses per property
+                    for exp in filtered_expenses:
+                        prop_id = exp.property_id
+                        if prop_id not in property_expenses:
+                            property_expenses[prop_id] = 0
+                        property_expenses[prop_id] += exp.amount
+                    
+                    # Get property names
+                    prop_names = []
+                    prop_income = []
+                    prop_expenses = []
+                    
+                    for prop in org_properties:
+                        prop_names.append(prop.name)
+                        prop_income.append(property_income.get(prop.id, 0))
+                        prop_expenses.append(property_expenses.get(prop.id, 0))
+                    
+                    fig = go.Figure()
+                    fig.add_trace(go.Bar(name='Income', x=prop_names, y=prop_income, marker_color='#2E8B57'))
+                    fig.add_trace(go.Bar(name='Expenses', x=prop_names, y=prop_expenses, marker_color='#DC143C'))
+                    fig.update_layout(title="Property Income vs Expenses", barmode='group')
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("No property performance data available")
+            
+            # Expense Analysis
+            if filtered_expenses:
+                st.subheader("💰 Expense Analysis")
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Expense categories
+                    expense_categories = {}
+                    for exp in filtered_expenses:
+                        category = exp.expense_type
+                        if category not in expense_categories:
+                            expense_categories[category] = 0
+                        expense_categories[category] += exp.amount
+                    
+                    if expense_categories:
+                        categories = list(expense_categories.keys())
+                        amounts = list(expense_categories.values())
+                        
+                        fig = go.Figure(data=[go.Pie(labels=categories, values=amounts, hole=0.3)])
+                        fig.update_layout(title="Expense Categories")
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    # Monthly expense trend
+                    expense_by_month = {}
+                    for exp in filtered_expenses:
+                        month_key = exp.transaction_date.strftime('%Y-%m')
+                        if month_key not in expense_by_month:
+                            expense_by_month[month_key] = 0
+                        expense_by_month[month_key] += exp.amount
+                    
+                    months = sorted(expense_by_month.keys())
+                    amounts = [expense_by_month[month] for month in months]
+                    
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=months, y=amounts, mode='lines+markers', 
+                                           name='Expenses', line=dict(color='#DC143C')))
+                    fig.update_layout(title="Monthly Expense Trend", xaxis_title="Month", yaxis_title="Expenses ($)")
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            # ROI Analysis
+            st.subheader("📊 ROI Analysis")
+            if org_properties:
+                roi_data = []
+                for prop in org_properties:
+                    prop_income = sum(inc.amount for inc in filtered_income if inc.property_id == prop.id)
+                    prop_expenses = sum(exp.amount for exp in filtered_expenses if exp.property_id == prop.id)
+                    net_profit = prop_income - prop_expenses
+                    roi = (net_profit / prop.purchase_price * 100) if prop.purchase_price > 0 else 0
+                    
+                    roi_data.append({
+                        'Property': prop.name,
+                        'Purchase Price': prop.purchase_price,
+                        'Net Profit': net_profit,
+                        'ROI %': roi
+                    })
+                
+                if roi_data:
+                    roi_df = pd.DataFrame(roi_data)
+                    st.dataframe(roi_df, use_container_width=True)
+                    
+                    # ROI chart
+                    fig = go.Figure()
+                    fig.add_trace(go.Bar(x=roi_df['Property'], y=roi_df['ROI %'], 
+                                       marker_color='#4169E1'))
+                    fig.update_layout(title="Property ROI Comparison", xaxis_title="Property", yaxis_title="ROI %")
+                    st.plotly_chart(fig, use_container_width=True)
     
     elif selected == "AI Insights":
         st.markdown('<h1 class="main-header">🤖 AI-Powered Insights</h1>', unsafe_allow_html=True)
