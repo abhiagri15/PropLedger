@@ -7,6 +7,7 @@ from datetime import datetime
 class DatabaseOperations:
     def __init__(self):
         self.client = get_supabase_client()
+        self.supabase = self.client  # Alias for compatibility with rent reminder service
     
     # Organization Operations
     def get_user_organizations(self, user_id: str) -> List[Organization]:
@@ -100,6 +101,29 @@ class DatabaseOperations:
         except Exception as e:
             st.error(f"Error fetching property: {str(e)}")
             return None
+    
+    def get_property_by_id(self, property_id: str) -> Optional[Property]:
+        """Get a specific property by ID (string version for rent reminders)"""
+        try:
+            result = self.client.table("properties").select("*").eq("id", property_id).execute()
+            if result.data:
+                return Property(**result.data[0])
+            return None
+        except Exception as e:
+            st.error(f"Error fetching property: {str(e)}")
+            return None
+    
+    def get_properties_by_organization(self, organization_id: str) -> List[Property]:
+        """Get all properties for a specific organization"""
+        try:
+            result = self.client.table("properties").select("*").eq("organization_id", organization_id).execute()
+            properties = []
+            for row in result.data:
+                properties.append(Property(**row))
+            return properties
+        except Exception as e:
+            st.error(f"Error fetching properties by organization: {str(e)}")
+            return []
     
     def update_property(self, property_id: int, property: Property) -> bool:
         """Update a property"""

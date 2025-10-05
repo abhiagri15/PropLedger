@@ -89,3 +89,19 @@ class Category(BaseModel):
     type: str  # 'income' or 'expense'
     description: Optional[str] = None
     created_at: Optional[datetime] = None
+
+class RentReminder(BaseModel):
+    id: Optional[int] = None
+    property_id: int
+    organization_id: int
+    user_id: str
+    reminder_month: int  # 1-12
+    reminder_year: int
+    reminder_date: datetime
+    last_sent_date: Optional[datetime] = None
+    next_reminder_date: datetime
+    is_rent_recorded: bool = False
+    reminder_count: int = 0
+    max_reminders: int = 6
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None

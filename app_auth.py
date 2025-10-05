@@ -341,10 +341,10 @@ def show_main_app():
         # Navigation - Most important section
         selected = option_menu(
             menu_title="📋 Navigation",
-            options=["Organizations Dashboard", "Dashboard", "Properties", "Income", "Expenses", "Analytics", "AI Insights"],
-            icons=["building", "speedometer2", "house", "cash-coin", "receipt", "graph-up", "robot"],
+            options=["Organizations Dashboard", "Dashboard", "Properties", "Income", "Expenses", "Analytics", "Rent Reminders", "Reports", "AI Insights"],
+            icons=["building", "speedometer2", "house", "cash-coin", "receipt", "graph-up", "bell", "file-earmark-text", "robot"],
             menu_icon="cast",
-            default_index=0,
+            default_index=1,
         )
         
         st.markdown("---")
@@ -1783,6 +1783,522 @@ def show_main_app():
                     fig.update_layout(title="Property ROI Comparison", xaxis_title="Property", yaxis_title="ROI %")
                     st.plotly_chart(fig, use_container_width=True)
     
+    elif selected == "Rent Reminders":
+        st.markdown('<h1 class="main-header">🔔 Rent Reminders</h1>', unsafe_allow_html=True)
+        
+        # Check if demo mode
+        is_demo_mode = False
+        if st.session_state.user:
+            if hasattr(st.session_state.user, 'email'):
+                is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
+            else:
+                is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
+        
+        if is_demo_mode:
+            # Demo mode - show sample rent reminder data
+            st.markdown('<div class="info-box">🎯 <strong>Demo Mode</strong> - Showing sample rent reminder data. Sign up to manage your own reminders!</div>', unsafe_allow_html=True)
+            
+            # Demo rent reminders
+            st.markdown("### Sample Rent Reminders")
+            
+            demo_reminders = [
+                {
+                    'property': 'Downtown Apartment',
+                    'month': 'January 2024',
+                    'status': 'Due',
+                    'reminder_count': 2,
+                    'next_reminder': '2024-01-15',
+                    'rent_recorded': False
+                },
+                {
+                    'property': 'Suburban House',
+                    'month': 'January 2024',
+                    'status': 'Completed',
+                    'reminder_count': 1,
+                    'next_reminder': 'N/A',
+                    'rent_recorded': True
+                },
+                {
+                    'property': 'Commercial Space',
+                    'month': 'January 2024',
+                    'status': 'Overdue',
+                    'reminder_count': 4,
+                    'next_reminder': '2024-01-20',
+                    'rent_recorded': False
+                }
+            ]
+            
+            for reminder in demo_reminders:
+                with st.container():
+                    col1, col2, col3, col4 = st.columns([3, 2, 2, 2])
+                    
+                    with col1:
+                        st.write(f"**{reminder['property']}**")
+                        st.caption(f"Month: {reminder['month']}")
+                    
+                    with col2:
+                        if reminder['status'] == 'Completed':
+                            st.success("✅ Rent Recorded")
+                        elif reminder['status'] == 'Due':
+                            st.warning("⏰ Due Soon")
+                        else:
+                            st.error("🚨 Overdue")
+                    
+                    with col3:
+                        st.write(f"Reminders: {reminder['reminder_count']}/6")
+                        if not reminder['rent_recorded']:
+                            st.caption(f"Next: {reminder['next_reminder']}")
+                    
+                    with col4:
+                        if not reminder['rent_recorded']:
+                            if st.button("Mark as Recorded", key=f"demo_record_{reminder['property']}"):
+                                st.success("Demo: Rent marked as recorded!")
+                        else:
+                            st.info("Rent recorded")
+                    
+                    st.markdown("---")
+            
+            # Demo reminder settings
+            st.markdown("### Reminder Settings (Demo)")
+            
+            with st.form("demo_reminder_settings"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.selectbox("Property", ["Downtown Apartment", "Suburban House", "Commercial Space"], key="demo_reminder_property")
+                    st.selectbox("Month", ["January 2024", "February 2024", "March 2024"], key="demo_reminder_month")
+                
+                with col2:
+                    st.number_input("Reminder Frequency (days)", value=5, min_value=1, max_value=30, key="demo_reminder_frequency")
+                    st.number_input("Max Reminders", value=6, min_value=1, max_value=12, key="demo_max_reminders")
+                
+                if st.form_submit_button("Create Demo Reminder", type="primary"):
+                    st.success("Demo reminder created! Reminders will be sent every 5 days after the 5th of each month.")
+                    st.info("Sign up to create real rent reminders!")
+            return
+        
+        # Get selected organization
+        selected_org_id = st.session_state.get('selected_organization')
+        if not selected_org_id:
+            st.error("Please select an organization first.")
+            return
+        
+        # Import rent reminder service
+        try:
+            from services.rent_reminder_service import RentReminderService
+            reminder_service = RentReminderService()
+        except ImportError:
+            st.error("Rent reminder service not available. Please check the installation.")
+            return
+        
+        # Check if rent_reminders table exists
+        try:
+            # Try to query the table to see if it exists
+            test_result = reminder_service.db.supabase.table("rent_reminders").select("id").limit(1).execute()
+        except Exception as e:
+            if "Could not find the table" in str(e):
+                st.error("❌ **Rent Reminders table not found in database!**")
+                st.markdown("""
+                **To set up the Rent Reminders feature, you need to:**
+                
+                1. **Go to your Supabase Dashboard**
+                2. **Navigate to SQL Editor**
+                3. **Run the complete setup script:**
+                
+                ```sql
+                -- Copy and paste the contents of database/setup_rent_reminders_complete.sql
+                ```
+                
+                4. **Refresh this page after running the SQL**
+                
+                **Alternative setup:**
+                - Run `python scripts/setup_rent_reminders.py` in your terminal
+                """)
+                return
+            else:
+                st.error(f"Database error: {str(e)}")
+                return
+        
+        # Get organization name
+        org = db.get_organization_by_id(selected_org_id)
+        org_name = org.name if org else "Unknown Organization"
+        
+        st.info(f"Rent Reminders for: **{org_name}**")
+        
+        # Create monthly reminders button
+        col1, col2, col3 = st.columns([2, 1, 1])
+        
+        with col1:
+            if st.button("🔄 Create Monthly Reminders", type="primary"):
+                with st.spinner("Creating reminders for all properties..."):
+                    created_count = reminder_service.create_monthly_reminders(
+                        selected_org_id, st.session_state.user_id
+                    )
+                    if created_count > 0:
+                        st.success(f"Created {created_count} new reminders for this month!")
+                    else:
+                        st.info("No new reminders needed - all properties already have reminders for this month.")
+        
+        with col2:
+            if st.button("📧 Process Due Reminders"):
+                with st.spinner("Processing due reminders..."):
+                    processed_count = reminder_service.process_due_reminders()
+                    if processed_count > 0:
+                        st.success(f"Processed {processed_count} due reminders!")
+                    else:
+                        st.info("No reminders are due at this time.")
+        
+        with col3:
+            if st.button("🔄 Refresh"):
+                st.rerun()
+        
+        st.markdown("---")
+        
+        # Get user ID for RLS compliance
+        user_id = None
+        if st.session_state.user:
+            if hasattr(st.session_state.user, 'id'):
+                user_id = st.session_state.user.id
+            elif isinstance(st.session_state.user, dict):
+                user_id = st.session_state.user.get('id')
+        
+        # Get properties for the organization
+        properties = db.get_properties_by_organization(selected_org_id)
+        
+        if not properties:
+            st.info(f"No properties found for {org_name}. Please add a property first.")
+        else:
+            # Show reminders for each property
+            current_date = date.today()
+            current_month = current_date.month
+            current_year = current_date.year
+            
+            st.markdown("### Current Month Reminders")
+            
+            for property_obj in properties:
+                with st.expander(f"🏠 {property_obj.address}", expanded=False):
+                    # Get reminder status for this property
+                    status = reminder_service.get_reminder_status(
+                        property_obj.id, current_month, current_year
+                    )
+                    
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        if status['rent_recorded']:
+                            st.success("✅ Rent Recorded")
+                        elif status['is_due']:
+                            st.error("🚨 Reminder Due")
+                        else:
+                            st.info("⏰ Pending")
+                    
+                    with col2:
+                        if status['has_reminder']:
+                            st.write(f"Reminders: {status['reminder_count']}/6")
+                            if status['next_reminder']:
+                                st.caption(f"Next: {status['next_reminder']}")
+                        else:
+                            st.write("No reminders set")
+                    
+                    with col3:
+                        if not status['rent_recorded']:
+                            if st.button("Mark Rent as Recorded", key=f"record_{property_obj.id}"):
+                                reminder_service.mark_rent_recorded(
+                                    property_obj.id, current_month, current_year, selected_org_id, user_id
+                                )
+                        else:
+                            st.info("Rent already recorded")
+            
+            # Historical reminders
+            st.markdown("### Historical Reminders")
+            
+            # Get all reminders for this organization
+            try:
+                result = reminder_service.db.supabase.table("rent_reminders").select("*").eq(
+                    "organization_id", selected_org_id
+                ).order("reminder_year", desc=True).order("reminder_month", desc=True).execute()
+                
+                if result.data:
+                    reminders_data = []
+                    for reminder_data in result.data:
+                        # Get property name
+                        property_obj = next((p for p in properties if p.id == reminder_data['property_id']), None)
+                        property_name = property_obj.address if property_obj else f"Property ID: {reminder_data['property_id']}"
+                        
+                        reminders_data.append({
+                            'property': property_name,
+                            'month': f"{reminder_data['reminder_month']:02d}/{reminder_data['reminder_year']}",
+                            'status': 'Completed' if reminder_data['is_rent_recorded'] else 'Pending',
+                            'reminder_count': reminder_data['reminder_count'],
+                            'last_sent': reminder_data['last_sent_date'],
+                            'created': reminder_data['created_at']
+                        })
+                    
+                    # Display in a table
+                    if reminders_data:
+                        st.dataframe(
+                            reminders_data,
+                            column_config={
+                                "property": "Property",
+                                "month": "Month",
+                                "status": "Status",
+                                "reminder_count": "Reminders Sent",
+                                "last_sent": "Last Sent",
+                                "created": "Created"
+                            },
+                            use_container_width=True
+                        )
+                    else:
+                        st.info("No historical reminders found.")
+                else:
+                    st.info("No reminders found for this organization.")
+                    
+            except Exception as e:
+                st.error(f"Error fetching historical reminders: {str(e)}")
+
+    elif selected == "Reports":
+        st.markdown('<h1 class="main-header">📊 Reports</h1>', unsafe_allow_html=True)
+        
+        # Check if demo mode
+        is_demo_mode = False
+        if st.session_state.user:
+            if hasattr(st.session_state.user, 'email'):
+                user_email = st.session_state.user.email
+            else:
+                user_email = st.session_state.user.get('email', 'Unknown')
+            
+            if user_email == 'demo@example.com':
+                is_demo_mode = True
+        
+        if is_demo_mode:
+            st.info("📊 **Demo Mode**: Showing sample reports with sample data")
+            
+            # Demo P&L Report
+            st.markdown("### 📈 Profit & Loss Report (Demo)")
+            
+            # Demo report type selection
+            col1, col2 = st.columns(2)
+            with col1:
+                demo_report_type = st.selectbox("Report Type", ["Yearly", "Monthly", "Custom"], key="demo_report_type")
+            
+            with col2:
+                if demo_report_type == "Yearly":
+                    demo_year = st.selectbox("Select Year", 
+                                           options=[2023, 2024, 2025], 
+                                           index=1,  # Default to 2024
+                                           key="demo_year_selector")
+                elif demo_report_type == "Monthly":
+                    current_year = date.today().year
+                    demo_month_options = [
+                        f"January {current_year}", f"February {current_year}", f"March {current_year}",
+                        f"April {current_year}", f"May {current_year}", f"June {current_year}",
+                        f"July {current_year}", f"August {current_year}", f"September {current_year}",
+                        f"October {current_year}", f"November {current_year}", f"December {current_year}"
+                    ]
+                    demo_selected_month = st.selectbox("Select Month", 
+                                                     options=demo_month_options,
+                                                     index=date.today().month - 1,
+                                                     key="demo_month_selector")
+                else:  # Custom
+                    col_start, col_end = st.columns(2)
+                    with col_start:
+                        demo_start_date = st.date_input("Start Date", value=date(2024, 1, 1), key="demo_custom_start")
+                    with col_end:
+                        demo_end_date = st.date_input("End Date", value=date(2024, 6, 30), key="demo_custom_end")
+            
+            # Demo data
+            demo_data = {
+                'Month': ['Jan 2024', 'Feb 2024', 'Mar 2024', 'Apr 2024', 'May 2024', 'Jun 2024'],
+                'Revenue': [2500, 2500, 2500, 2500, 2500, 2500],
+                'Expenses': [1800, 1900, 1750, 2000, 1850, 1950],
+                'Net Income': [700, 600, 750, 500, 650, 550]
+            }
+            
+            # Create demo P&L chart
+            from plotly.subplots import make_subplots
+            
+            fig = make_subplots(
+                rows=2, cols=1,
+                subplot_titles=('Monthly Revenue vs Expenses', 'Monthly Net Income'),
+                vertical_spacing=0.1
+            )
+            
+            # Revenue and Expenses
+            fig.add_trace(go.Bar(name='Revenue', x=demo_data['Month'], y=demo_data['Revenue'], 
+                               marker_color='#2E8B57'), row=1, col=1)
+            fig.add_trace(go.Bar(name='Expenses', x=demo_data['Month'], y=demo_data['Expenses'], 
+                               marker_color='#DC143C'), row=1, col=1)
+            
+            # Net Income
+            fig.add_trace(go.Bar(name='Net Income', x=demo_data['Month'], y=demo_data['Net Income'], 
+                               marker_color='#4169E1'), row=2, col=1)
+            
+            fig.update_layout(height=600, showlegend=True, title_text="Demo P&L Report")
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Demo summary
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Revenue", "$15,000", "5.2%")
+            with col2:
+                st.metric("Total Expenses", "$11,250", "3.1%")
+            with col3:
+                st.metric("Net Profit", "$3,750", "8.3%")
+        
+        else:
+            # Real P&L Report
+            st.markdown("### 📈 Profit & Loss Report")
+            
+            # Get selected organization
+            if 'selected_organization' in st.session_state and st.session_state.selected_organization:
+                selected_org_id = st.session_state.selected_organization
+                org_name = st.session_state.get('selected_org_name', 'Unknown Organization')
+                
+                # Date range selection
+                col1, col2 = st.columns(2)
+                with col1:
+                    report_type = st.selectbox("Report Type", ["Yearly", "Monthly", "Custom"], key="report_type")
+                
+                with col2:
+                    if report_type == "Yearly":
+                        selected_year = st.selectbox("Select Year", 
+                                                   options=list(range(2020, date.today().year + 2)), 
+                                                   index=date.today().year - 2020,
+                                                   key="year_selector")
+                        start_date = date(selected_year, 1, 1)
+                        end_date = date(selected_year + 1, 1, 1)
+                    elif report_type == "Monthly":
+                        # Show months of current year
+                        current_year = date.today().year
+                        month_options = [
+                            f"January {current_year}", f"February {current_year}", f"March {current_year}",
+                            f"April {current_year}", f"May {current_year}", f"June {current_year}",
+                            f"July {current_year}", f"August {current_year}", f"September {current_year}",
+                            f"October {current_year}", f"November {current_year}", f"December {current_year}"
+                        ]
+                        selected_month = st.selectbox("Select Month", 
+                                                    options=month_options,
+                                                    index=date.today().month - 1,
+                                                    key="month_selector")
+                        # Extract month number from selection
+                        month_number = month_options.index(selected_month) + 1
+                        start_date = date(current_year, month_number, 1)
+                        if month_number == 12:
+                            end_date = date(current_year + 1, 1, 1)
+                        else:
+                            end_date = date(current_year, month_number + 1, 1)
+                    else:  # Custom
+                        col_start, col_end = st.columns(2)
+                        with col_start:
+                            start_date = st.date_input("Start Date", value=date.today().replace(day=1), key="custom_start")
+                        with col_end:
+                            end_date = st.date_input("End Date", value=date.today(), key="custom_end")
+                
+                # Generate P&L Report
+                if st.button("Generate P&L Report", key="generate_pl"):
+                    try:
+                        # Get income data
+                        income_result = db.supabase.table("income").select("*").eq(
+                            "organization_id", selected_org_id
+                        ).gte("transaction_date", start_date.isoformat()).lt(
+                            "transaction_date", end_date.isoformat()
+                        ).execute()
+                        
+                        # Get expense data
+                        expense_result = db.supabase.table("expenses").select("*").eq(
+                            "organization_id", selected_org_id
+                        ).gte("transaction_date", start_date.isoformat()).lt(
+                            "transaction_date", end_date.isoformat()
+                        ).execute()
+                        
+                        if income_result.data or expense_result.data:
+                            # Calculate totals
+                            total_income = sum(float(item.get('amount', 0)) for item in income_result.data)
+                            total_expenses = sum(float(item.get('amount', 0)) for item in expense_result.data)
+                            net_profit = total_income - total_expenses
+                            
+                            # Display summary metrics
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.metric("Total Revenue", f"${total_income:,.2f}")
+                            with col2:
+                                st.metric("Total Expenses", f"${total_expenses:,.2f}")
+                            with col3:
+                                profit_color = "normal" if net_profit >= 0 else "inverse"
+                                st.metric("Net Profit", f"${net_profit:,.2f}", delta_color=profit_color)
+                            
+                            # Create detailed breakdown
+                            st.markdown("#### 📊 Revenue Breakdown")
+                            if income_result.data:
+                                income_df = pd.DataFrame(income_result.data)
+                                income_summary = income_df.groupby('income_type')['amount'].sum().reset_index()
+                                income_summary['amount'] = income_summary['amount'].astype(float)
+                                
+                                fig_income = go.Figure(data=[go.Pie(labels=income_summary['income_type'], 
+                                                                  values=income_summary['amount'],
+                                                                  hole=0.3)])
+                                fig_income.update_layout(title="Revenue by Type")
+                                st.plotly_chart(fig_income, use_container_width=True)
+                            else:
+                                st.info("No revenue data found for the selected period.")
+                            
+                            st.markdown("#### 💰 Expense Breakdown")
+                            if expense_result.data:
+                                expense_df = pd.DataFrame(expense_result.data)
+                                expense_summary = expense_df.groupby('expense_type')['amount'].sum().reset_index()
+                                expense_summary['amount'] = expense_summary['amount'].astype(float)
+                                
+                                fig_expense = go.Figure(data=[go.Pie(labels=expense_summary['expense_type'], 
+                                                                   values=expense_summary['amount'],
+                                                                   hole=0.3)])
+                                fig_expense.update_layout(title="Expenses by Type")
+                                st.plotly_chart(fig_expense, use_container_width=True)
+                            else:
+                                st.info("No expense data found for the selected period.")
+                            
+                            # Monthly trend if yearly report
+                            if report_type == "Yearly" and (income_result.data or expense_result.data):
+                                st.markdown("#### 📈 Monthly Trend")
+                                
+                                # Process monthly data
+                                monthly_data = {}
+                                for item in income_result.data:
+                                    month = item['transaction_date'][:7]  # YYYY-MM
+                                    if month not in monthly_data:
+                                        monthly_data[month] = {'income': 0, 'expenses': 0}
+                                    monthly_data[month]['income'] += float(item.get('amount', 0))
+                                
+                                for item in expense_result.data:
+                                    month = item['transaction_date'][:7]  # YYYY-MM
+                                    if month not in monthly_data:
+                                        monthly_data[month] = {'income': 0, 'expenses': 0}
+                                    monthly_data[month]['expenses'] += float(item.get('amount', 0))
+                                
+                                if monthly_data:
+                                    months = sorted(monthly_data.keys())
+                                    income_values = [monthly_data[month]['income'] for month in months]
+                                    expense_values = [monthly_data[month]['expenses'] for month in months]
+                                    profit_values = [income_values[i] - expense_values[i] for i in range(len(months))]
+                                    
+                                    fig_trend = go.Figure()
+                                    fig_trend.add_trace(go.Scatter(x=months, y=income_values, mode='lines+markers', 
+                                                                 name='Revenue', line=dict(color='#2E8B57')))
+                                    fig_trend.add_trace(go.Scatter(x=months, y=expense_values, mode='lines+markers', 
+                                                                 name='Expenses', line=dict(color='#DC143C')))
+                                    fig_trend.add_trace(go.Scatter(x=months, y=profit_values, mode='lines+markers', 
+                                                                 name='Net Profit', line=dict(color='#4169E1')))
+                                    
+                                    fig_trend.update_layout(title="Monthly P&L Trend", 
+                                                          xaxis_title="Month", yaxis_title="Amount ($)")
+                                    st.plotly_chart(fig_trend, use_container_width=True)
+                        else:
+                            st.info("No financial data found for the selected period.")
+                            
+                    except Exception as e:
+                        st.error(f"Error generating P&L report: {str(e)}")
+            else:
+                st.warning("Please select an organization first to view reports.")
+
     elif selected == "AI Insights":
         st.markdown('<h1 class="main-header">🤖 AI-Powered Insights</h1>', unsafe_allow_html=True)
         st.info("AI insights functionality - Sign up to use with your own data!")
