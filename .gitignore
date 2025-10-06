@@ -2,7 +2,6 @@
 .env
 .env.local
 .env.*.local
-env.example
 
 # Python
 __pycache__/
@@ -78,6 +77,7 @@ create_*.py
 # SQL files (keep only essential schema files)
 *.sql
 !database/complete_schema.sql
+!database/schema.sql
 
 # Batch files
 *.bat

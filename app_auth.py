@@ -9,12 +9,22 @@ from database.database_operations import DatabaseOperations
 from database.models import Property, Income, Expense, PropertyType, IncomeType, ExpenseType, Organization, UserOrganization
 from llm.llm_insights import LLMInsights
 from services.geocoding import geocoding_service
+from utils.session_manager import SessionManager
 import config
 import os
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+# Ensure pandas is available globally
+try:
+    import pandas as pd
+    # Make sure pandas is available in global scope
+    globals()['pd'] = pd
+except ImportError:
+    st.error("Pandas is not installed. Please install it with: pip install pandas")
+    st.stop()
 
 # Page configuration
 st.set_page_config(
@@ -23,6 +33,17 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Set default navigation state
+def set_default_navigation():
+    """Set default navigation state to ensure proper page alignment"""
+    # Initialize default navigation state if not set
+    if 'default_navigation_set' not in st.session_state:
+        st.session_state.default_navigation_set = True
+        # Force the app to show the Dashboard by default
+        st.session_state.force_dashboard = True
+        # Set the selected navigation to Dashboard
+        st.session_state.main_navigation = "Dashboard"
 
 # Custom CSS
 st.markdown("""
@@ -102,17 +123,45 @@ st.markdown("""
         border-left: 4px solid #1f77b4;
         margin: 1rem 0;
     }
+    
+    /* Auto-highlight Dashboard on page load */
+    .stOptionMenu [data-testid="stOptionMenu"] [role="menuitem"]:nth-child(2) {
+        background-color: #02ab21 !important;
+        color: white !important;
+    }
+    
+    /* Ensure Dashboard is always visible and highlighted */
+    .stOptionMenu [data-testid="stOptionMenu"] [role="menuitem"]:nth-child(2):hover {
+        background-color: #02ab21 !important;
+        color: white !important;
+    }
 </style>
+
+<script>
+// Auto-click Dashboard on page load
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        // Find the Dashboard option (index 1) and click it
+        const dashboardOption = document.querySelector('[data-testid="stOptionMenu"] [role="menuitem"]:nth-child(2)');
+        if (dashboardOption && !dashboardOption.classList.contains('stOptionMenu-selected')) {
+            dashboardOption.click();
+        }
+    }, 500);
+});
+
+// Also try to click Dashboard when the page is fully loaded
+window.addEventListener('load', function() {
+    setTimeout(function() {
+        const dashboardOption = document.querySelector('[data-testid="stOptionMenu"] [role="menuitem"]:nth-child(2)');
+        if (dashboardOption && !dashboardOption.classList.contains('stOptionMenu-selected')) {
+            dashboardOption.click();
+        }
+    }, 1000);
+});
+</script>
+
 """, unsafe_allow_html=True)
 
-def initialize_session_state():
-    """Initialize session state variables"""
-    if 'authenticated' not in st.session_state:
-        st.session_state.authenticated = False
-    if 'user' not in st.session_state:
-        st.session_state.user = None
-    if 'auth_mode' not in st.session_state:
-        st.session_state.auth_mode = 'login'  # 'login' or 'signup'
 
 def show_auth_page():
     """Display authentication page"""
@@ -153,6 +202,7 @@ def show_auth_page():
                             st.success("✅ Successfully signed in!")
                             # Clear the form by incrementing reset counter
                             st.session_state.login_form_reset_counter = st.session_state.get('login_form_reset_counter', 0) + 1
+                            # Session is automatically stored in Supabase
                             st.rerun()
                         else:
                             st.error("❌ Invalid email or password")
@@ -217,6 +267,8 @@ def show_auth_page():
                                         if user_org_response.data:
                                             # Set the created organization as selected
                                             st.session_state.selected_organization = org_id
+                                            st.session_state.selected_org_id = org_id
+                                            st.session_state.selected_org_name = signup_organization
                                             st.success("✅ Account and organization created successfully! Please check your email to verify your account.")
                                             st.info("📧 A verification email has been sent to your email address.")
                                         else:
@@ -271,19 +323,23 @@ def show_main_app():
         st.markdown("# 🏠 PropLedger")
         
         # User info - Compact
-        if st.session_state.user:
-            # Handle both dict and User object types
-            if hasattr(st.session_state.user, 'email'):
-                # User object from Supabase
-                user_email = getattr(st.session_state.user, 'email', 'Unknown')
-                user_metadata = getattr(st.session_state.user, 'user_metadata', {})
-                user_name = user_metadata.get('full_name', user_email) if isinstance(user_metadata, dict) else user_email
-                user_id = getattr(st.session_state.user, 'id', None)
+        if SessionManager.get_user():
+            # Get user info using session manager
+            user_email = SessionManager.get_user_email() or 'Unknown'
+            user_id = SessionManager.get_user_id()
+            
+            # Get user name from metadata
+            user = SessionManager.get_user()
+            if user:
+                if hasattr(user, 'user_metadata'):
+                    user_metadata = getattr(user, 'user_metadata', {})
+                    user_name = user_metadata.get('full_name', user_email) if isinstance(user_metadata, dict) else user_email
+                elif isinstance(user, dict):
+                    user_name = user.get('user_metadata', {}).get('full_name', user_email)
+                else:
+                    user_name = user_email
             else:
-                # Dictionary format (demo mode)
-                user_email = st.session_state.user.get('email', 'Unknown')
-                user_name = st.session_state.user.get('user_metadata', {}).get('full_name', user_email)
-                user_id = st.session_state.user.get('id', None)
+                user_name = user_email
             
             st.markdown(f"**{user_name}**")
             
@@ -324,14 +380,8 @@ def show_main_app():
                         del st.session_state.selected_organization
         
         # Authentication status - Compact
-        if st.session_state.user:
-            # Check if it's demo mode
-            if hasattr(st.session_state.user, 'email'):
-                is_demo = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
-            else:
-                is_demo = st.session_state.user.get('email', '') == 'demo@example.com'
-            
-            if is_demo:
+        if SessionManager.get_user():
+            if SessionManager.is_demo_mode():
                 st.markdown('🎯 **DEMO MODE**')
             else:
                 st.markdown('✅ **AUTHENTICATED**')
@@ -339,12 +389,22 @@ def show_main_app():
         st.markdown("---")
         
         # Navigation - Most important section
+        # Force Dashboard selection on first load
+        if st.session_state.get('force_dashboard', False):
+            st.session_state.force_dashboard = False
+            # Force rerun to ensure Dashboard is selected
+            st.rerun()
+        
+        # Ensure Dashboard is always selected on first load
+        if 'main_navigation' not in st.session_state:
+            st.session_state.main_navigation = "Dashboard"
+        
         selected = option_menu(
             menu_title="📋 Navigation",
-            options=["Organizations Dashboard", "Dashboard", "Properties", "Income", "Expenses", "Analytics", "Rent Reminders", "Reports", "AI Insights"],
-            icons=["building", "speedometer2", "house", "cash-coin", "receipt", "graph-up", "bell", "file-earmark-text", "robot"],
+            options=["Organizations Dashboard", "Dashboard", "Properties", "Income", "Expenses", "Analytics", "Rent Reminders", "Reports", "📊 Budgets", "🏗️ CapEx", "👥 Vendors", "AI Insights"],
+            icons=["building", "speedometer2", "house", "cash-coin", "receipt", "graph-up", "bell", "file-earmark-text", "calculator", "tools", "people", "robot"],
             menu_icon="cast",
-            default_index=1,
+            default_index=1,  # Dashboard is default
             key="main_navigation",
             styles={
                 "container": {"padding": "0!important", "background-color": "#fafafa"},
@@ -358,9 +418,7 @@ def show_main_app():
         
         # Logout button - Compact
         if st.button("🚪 Logout", use_container_width=True):
-            st.session_state.authenticated = False
-            st.session_state.user = None
-            st.rerun()
+            SessionManager.sign_out()
 
     # Main content based on selected page
     if selected == "Organizations Dashboard":
@@ -2423,7 +2481,7 @@ def show_main_app():
                             # Add Total row
                             total_amount = df['Amount'].sum()
                             total_row = pd.DataFrame({
-                                'S.No.': [''],
+                                'S.No.': [0],  # Use 0 instead of empty string
                                 'Date': [''],
                                 'Type': [''],
                                 'Property': [''],
@@ -2525,15 +2583,1136 @@ def show_main_app():
             else:
                 st.warning("Please select an organization first to view transactions.")
 
+    elif selected == "📊 Budgets":
+        st.markdown('<h1 class="main-header">📊 Budget Management</h1>', unsafe_allow_html=True)
+        
+        if st.session_state.get('selected_organization'):
+            try:
+                selected_org_id = st.session_state.selected_organization
+                
+                # Budget tabs
+                budget_tab1, budget_tab2, budget_tab3, budget_tab4 = st.tabs([
+                    "📋 Budget vs Actual", "➕ Create Budget", "📈 Budget Trends", "📊 Budget Analysis"
+                ])
+                
+                with budget_tab1:
+                    st.subheader("📋 Budget vs Actual")
+                    
+                    # Period selector - Analysis Period first
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        # Period type selection for analysis - FIRST
+                        analysis_period_type = st.selectbox("Analysis Period", ["Monthly", "Yearly", "Custom Date Range"], key="analysis_period_type")
+                    
+                    with col2:
+                        if analysis_period_type == "Monthly":
+                            # Month names instead of numbers
+                            month_names = ["January", "February", "March", "April", "May", "June", 
+                                         "July", "August", "September", "October", "November", "December"]
+                            budget_month = st.selectbox("Month", month_names, index=date.today().month - 1, key="budget_month")
+                            budget_month_num = month_names.index(budget_month) + 1  # Convert to number for database
+                            
+                            # Year for monthly analysis
+                            budget_year = st.selectbox("Year", range(2020, 2030), index=date.today().year - 2020, key="budget_year_monthly")
+                            budget_start_date = None
+                            budget_end_date = None
+                            
+                        elif analysis_period_type == "Yearly":
+                            budget_year = st.selectbox("Year", range(2020, 2030), index=date.today().year - 2020, key="budget_year_yearly")
+                            budget_month_num = None
+                            budget_start_date = None
+                            budget_end_date = None
+                            
+                        else:  # Custom Date Range
+                            budget_year = None
+                            budget_month_num = None
+                            budget_start_date = st.date_input("Start Date", value=date.today(), key="budget_start_date")
+                            budget_end_date = st.date_input("End Date", value=date.today(), key="budget_end_date")
+                    
+                    # Get budget vs actual data
+                    try:
+                        # Check if budget_lines table exists
+                        try:
+                            # Get budget lines for the period based on analysis type
+                            budget_query = db.client.table("budget_lines").select(
+                                "*, categories(name), subcategories(name)"
+                            ).eq("company_id", selected_org_id)
+                            
+                            if analysis_period_type == "Monthly":
+                                budget_query = budget_query.eq("period_year", budget_year).eq("period_month", budget_month_num)
+                            elif analysis_period_type == "Yearly":
+                                # For yearly, we'll get all months of the year
+                                budget_query = budget_query.eq("period_year", budget_year)
+                            else:  # Custom Date Range
+                                # For custom date range, we'll need to filter by date range
+                                # Since the current schema doesn't support custom dates, we'll show a message
+                                st.warning("Custom date range budgets require database schema update. Please use Monthly or Yearly for now.")
+                                budget_query = budget_query.eq("period_year", budget_year)
+                            
+                            budget_result = budget_query.execute()
+                        except Exception as table_error:
+                            if "Could not find the table" in str(table_error):
+                                st.error("❌ **Budget table not found in database!**")
+                                st.info("**To fix this:**")
+                                st.markdown("""
+                                1. Go to your Supabase project dashboard
+                                2. Navigate to **SQL Editor**
+                                3. Copy and paste the SQL commands from `database/setup_budget_tables_simple.sql`
+                                4. Click **Run** to execute the script
+                                5. Refresh this page
+                                """)
+                                return
+                            else:
+                                raise table_error
+                        
+                        budget_lines = budget_result.data if budget_result.data else []
+                        
+                        if budget_lines:
+                            # Get actual transactions for the period
+                            start_date = date(budget_year, budget_month, 1)
+                            if budget_month == 12:
+                                end_date = date(budget_year + 1, 1, 1)
+                            else:
+                                end_date = date(budget_year, budget_month + 1, 1)
+                            
+                            # Get transactions
+                            income_result = db.client.table("income").select("*").eq("organization_id", selected_org_id).gte("transaction_date", start_date.isoformat()).lt("transaction_date", end_date.isoformat()).execute()
+                            expense_result = db.client.table("expenses").select("*").eq("organization_id", selected_org_id).gte("transaction_date", start_date.isoformat()).lt("transaction_date", end_date.isoformat()).execute()
+                            
+                            # Calculate actuals by category
+                            actuals_by_category = {}
+                            
+                            # Process expenses
+                            for expense in expense_result.data:
+                                category_name = expense.get('category', 'Uncategorized')
+                                if category_name not in actuals_by_category:
+                                    actuals_by_category[category_name] = 0
+                                actuals_by_category[category_name] += float(expense.get('amount', 0))
+                            
+                            # Create budget vs actual comparison
+                            budget_vs_actual = []
+                            for budget in budget_lines:
+                                category_name = budget.get('categories', {}).get('name', 'Unknown')
+                                actual_amount = actuals_by_category.get(category_name, 0)
+                                budgeted_amount = float(budget.get('amount_planned', 0))
+                                variance = actual_amount - budgeted_amount
+                                variance_percentage = (variance / budgeted_amount * 100) if budgeted_amount > 0 else 0
+                                
+                                budget_vs_actual.append({
+                                    'Category': category_name,
+                                    'Budgeted': f"${budgeted_amount:,.2f}",
+                                    'Actual': f"${actual_amount:,.2f}",
+                                    'Variance': f"${variance:,.2f}",
+                                    'Variance %': f"{variance_percentage:+.1f}%"
+                                })
+                            
+                            # Display results
+                            if budget_vs_actual:
+                                df_budget = pd.DataFrame(budget_vs_actual)
+                                st.dataframe(df_budget, use_container_width=True)
+                                
+                                # Summary metrics
+                                st.subheader("Summary")
+                                col1, col2, col3, col4 = st.columns(4)
+                                
+                                total_budgeted = sum(float(b.get('amount_planned', 0)) for b in budget_lines)
+                                total_actual = sum(actuals_by_category.values())
+                                total_variance = total_actual - total_budgeted
+                                variance_percentage = (total_variance / total_budgeted * 100) if total_budgeted > 0 else 0
+                                
+                                with col1:
+                                    st.metric("Total Budgeted", f"${total_budgeted:,.2f}")
+                                with col2:
+                                    st.metric("Total Actual", f"${total_actual:,.2f}")
+                                with col3:
+                                    st.metric("Total Variance", f"${total_variance:,.2f}")
+                                with col4:
+                                    st.metric("Variance %", f"{variance_percentage:+.1f}%")
+                            else:
+                                st.info("No budget data found for the selected period.")
+                        else:
+                            st.info("No budget lines found for the selected period.")
+                            
+                    except Exception as e:
+                        st.error(f"Error loading budget data: {str(e)}")
+                
+                with budget_tab2:
+                    st.subheader("➕ Create Budget")
+                    
+                    # Initialize form reset counter
+                    if 'budget_form_reset_counter' not in st.session_state:
+                        st.session_state.budget_form_reset_counter = 0
+                    
+                    # Handle form reset
+                    if st.session_state.get('budget_form_submitted', False):
+                        st.session_state.budget_form_submitted = False
+                        st.info("🔄 Form has been reset. You can create a new budget.")
+                    
+                    with st.form(f"create_budget_form_{st.session_state.budget_form_reset_counter}"):
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            budget_scope = st.selectbox("Scope", ["Organization", "Property"], key=f"budget_scope_{st.session_state.budget_form_reset_counter}")
+                            
+                            # Period type selection
+                            period_type = st.selectbox("Period Type", ["Monthly", "Yearly", "Custom Date Range"], key=f"budget_period_type_{st.session_state.budget_form_reset_counter}")
+                            
+                            # Year selection (for Monthly and Yearly)
+                            if period_type in ["Monthly", "Yearly"]:
+                                budget_year = st.selectbox("Year", range(2020, 2030), index=date.today().year - 2020, key=f"create_budget_year_{st.session_state.budget_form_reset_counter}")
+                            else:
+                                budget_year = None
+                            
+                            # Create containers for conditional display
+                            month_container = st.empty()
+                            
+                            if period_type == "Monthly":
+                                # Month names instead of numbers
+                                month_names = ["January", "February", "March", "April", "May", "June", 
+                                             "July", "August", "September", "October", "November", "December"]
+                                with month_container.container():
+                                    budget_month = st.selectbox("Month", month_names, index=date.today().month - 1, key=f"create_budget_month_{st.session_state.budget_form_reset_counter}")
+                                budget_month_num = month_names.index(budget_month) + 1  # Convert to number for database
+                                budget_start_date = None
+                                budget_end_date = None
+                                
+                            elif period_type == "Yearly":
+                                # Clear the month container for yearly
+                                month_container.empty()
+                                budget_month_num = None  # No specific month for yearly
+                                budget_start_date = None
+                                budget_end_date = None
+                                # Debug info
+                                st.info("Yearly period selected - Month dropdown is hidden")
+                                
+                            else:  # Custom Date Range
+                                # Clear the month container for custom date range
+                                month_container.empty()
+                                budget_month_num = None
+                                budget_start_date = st.date_input("Start Date", value=date.today(), key=f"budget_start_date_{st.session_state.budget_form_reset_counter}")
+                                budget_end_date = st.date_input("End Date", value=date.today(), key=f"budget_end_date_{st.session_state.budget_form_reset_counter}")
+                                
+                                # Validate date range
+                                if budget_start_date and budget_end_date and budget_start_date > budget_end_date:
+                                    st.error("Start date must be before end date.")
+                        
+                        with col2:
+                            if budget_scope == "Property":
+                                # Get properties for the organization
+                                properties_result = db.client.table("properties").select("id, name").eq("organization_id", selected_org_id).execute()
+                                property_options = {p['name']: p['id'] for p in properties_result.data} if properties_result.data else {}
+                                selected_property = st.selectbox("Property", list(property_options.keys()), key=f"budget_property_{st.session_state.budget_form_reset_counter}")
+                                scope_id = property_options.get(selected_property) if selected_property else None
+                            else:
+                                scope_id = selected_org_id
+                            
+                            # Get categories
+                            try:
+                                categories_result = db.client.table("categories").select("id, name").execute()
+                                category_options = {c['name']: c['id'] for c in categories_result.data} if categories_result.data else {}
+                                
+                                if not category_options:
+                                    st.warning("⚠️ No categories found. Creating default categories...")
+                                    # Create default categories
+                                    default_categories = [
+                                        {"name": "Rent", "type": "INCOME"},
+                                        {"name": "Maintenance", "type": "EXPENSE"},
+                                        {"name": "Utilities", "type": "EXPENSE"},
+                                        {"name": "Insurance", "type": "EXPENSE"},
+                                        {"name": "Property Tax", "type": "EXPENSE"},
+                                        {"name": "Management Fee", "type": "EXPENSE"}
+                                    ]
+                                    
+                                    for cat in default_categories:
+                                        try:
+                                            db.client.table("categories").insert(cat).execute()
+                                        except:
+                                            pass  # Ignore if already exists
+                                    
+                                    # Refresh categories
+                                    categories_result = db.client.table("categories").select("id, name").execute()
+                                    category_options = {c['name']: c['id'] for c in categories_result.data} if categories_result.data else {}
+                                
+                                selected_category = st.selectbox("Category", list(category_options.keys()), key=f"budget_category_{st.session_state.budget_form_reset_counter}")
+                                category_id = category_options.get(selected_category) if selected_category else None
+                                
+                            except Exception as e:
+                                st.error(f"Error loading categories: {str(e)}")
+                                category_options = {}
+                                selected_category = None
+                                category_id = None
+                        
+                        # Amount type selection
+                        amount_type = st.radio("Amount Type", ["Fixed Amount", "Percentage of Monthly Rent"], key=f"budget_amount_type_{st.session_state.budget_form_reset_counter}")
+                        
+                        # Create container for amount input
+                        amount_container = st.empty()
+                        
+                        # Initialize amount_planned
+                        amount_planned = 0
+                        
+                        if amount_type == "Fixed Amount":
+                            with amount_container.container():
+                                amount_planned = st.number_input("Budgeted Amount ($)", min_value=0.01, step=0.01, key=f"budget_amount_{st.session_state.budget_form_reset_counter}")
+                        else:
+                            # Percentage of monthly rent
+                            with amount_container.container():
+                                percentage = st.number_input("Percentage (%)", min_value=0.1, max_value=100.0, step=0.1, value=10.0, key=f"budget_percentage_{st.session_state.budget_form_reset_counter}")
+                            
+                            # Auto-calculate using property rent from database
+                            if budget_scope == "Property" and scope_id:
+                                try:
+                                    # Get property rent from database
+                                    property_result = db.client.table("properties").select("monthly_rent").eq("id", scope_id).execute()
+                                    
+                                    if property_result.data and property_result.data[0].get('monthly_rent'):
+                                        monthly_rent = property_result.data[0]['monthly_rent']
+                                        amount_planned = (percentage / 100) * monthly_rent
+                                        st.success(f"**Property Monthly Rent:** ${monthly_rent:,.2f}")
+                                        st.success(f"**Calculated Amount:** ${amount_planned:,.2f} ({percentage}% of ${monthly_rent:,.2f})")
+                                    else:
+                                        amount_planned = 0
+                                        st.warning("⚠️ No monthly rent found for selected property. Please add monthly rent to the property first.")
+                                except Exception as e:
+                                    amount_planned = 0
+                                    st.error(f"Error fetching property rent: {str(e)}")
+                            else:
+                                # For organization scope, show manual input
+                                monthly_rent = st.number_input("Monthly Rent ($)", min_value=0.01, step=0.01, key=f"budget_monthly_rent_{st.session_state.budget_form_reset_counter}")
+                                if monthly_rent > 0:
+                                    amount_planned = (percentage / 100) * monthly_rent
+                                    st.info(f"**Calculated Amount:** ${amount_planned:,.2f} ({percentage}% of ${monthly_rent:,.2f})")
+                                else:
+                                    amount_planned = 0
+                                    st.warning("Please enter a valid monthly rent amount")
+                        
+                        notes = st.text_area("Notes (Optional)", key=f"budget_notes_{st.session_state.budget_form_reset_counter}")
+                        
+                        submitted = st.form_submit_button("Create Budget", type="primary")
+                        
+                        if submitted:
+                            # Validate required fields
+                            if not amount_planned or amount_planned <= 0:
+                                st.error("Please enter a valid budget amount.")
+                            elif not category_id:
+                                st.error("Please select a category.")
+                            elif budget_scope == "Property" and not scope_id:
+                                st.error("Please select a property.")
+                            else:
+                                try:
+                                    # Prepare budget data based on period type
+                                    budget_data = {
+                                        'company_id': selected_org_id,
+                                        'scope_type': 'ORGANIZATION' if budget_scope == "Organization" else 'PROPERTY',
+                                        'scope_id': scope_id,
+                                        'category_id': category_id,
+                                        'amount_planned': amount_planned,
+                                        'notes': notes
+                                    }
+                                    
+                                    # Add period-specific fields (using existing schema)
+                                    if period_type == "Monthly":
+                                        budget_data.update({
+                                            'period_month': budget_month_num,
+                                            'period_year': budget_year
+                                        })
+                                    elif period_type == "Yearly":
+                                        # For yearly budgets, we'll create 12 monthly entries
+                                        # This is a workaround until the schema is updated
+                                        st.warning("Yearly budgets will create 12 monthly entries. For now, please use Monthly budgets.")
+                                        budget_data.update({
+                                            'period_month': 1,  # Default to January
+                                            'period_year': budget_year
+                                        })
+                                    else:  # Custom Date Range
+                                        st.warning("Custom date range budgets require database schema update. Please use Monthly for now.")
+                                        budget_data.update({
+                                            'period_month': budget_month_num,
+                                            'period_year': budget_year
+                                        })
+                                
+                                    result = db.client.table("budget_lines").insert(budget_data).execute()
+                                    
+                                    if result.data:
+                                        st.success("✅ Budget created successfully!")
+                                        # Clear the form by incrementing reset counter
+                                        st.session_state.budget_form_reset_counter = st.session_state.get('budget_form_reset_counter', 0) + 1
+                                        # Force form reset
+                                        st.session_state.budget_form_submitted = True
+                                        st.rerun()
+                                    else:
+                                        st.error("❌ Failed to create budget.")
+                                        
+                                except Exception as e:
+                                    st.error(f"Error creating budget: {str(e)}")
+                
+                with budget_tab3:
+                    st.subheader("📈 Budget Trends")
+                    
+                    # Period selector for trends
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        trend_period_type = st.selectbox("Trend Period Type", ["Monthly", "Yearly", "Custom Date Range"], key="trend_period_type")
+                    
+                    with col2:
+                        if trend_period_type == "Monthly":
+                            trend_year = st.selectbox("Year", range(2020, 2030), index=date.today().year - 2020, key="trend_year")
+                            trend_start_date = None
+                            trend_end_date = None
+                        elif trend_period_type == "Yearly":
+                            trend_start_year = st.selectbox("Start Year", range(2020, 2030), index=date.today().year - 2020, key="trend_start_year")
+                            trend_end_year = st.selectbox("End Year", range(2020, 2030), index=date.today().year - 2020, key="trend_end_year")
+                            trend_start_date = None
+                            trend_end_date = None
+                        else:  # Custom Date Range
+                            trend_start_date = st.date_input("Start Date", value=date.today(), key="trend_start_date")
+                            trend_end_date = st.date_input("End Date", value=date.today(), key="trend_end_date")
+                            trend_start_year = None
+                            trend_end_year = None
+                    
+                    # Validate date ranges
+                    if trend_period_type == "Yearly" and trend_start_year and trend_end_year and trend_start_year > trend_end_year:
+                        st.error("Start year must be before end year.")
+                    elif trend_period_type == "Custom Date Range" and trend_start_date and trend_end_date and trend_start_date > trend_end_date:
+                        st.error("Start date must be before end date.")
+                    else:
+                        try:
+                            # Get budget trends data based on period type
+                            trends_query = db.client.table("budget_lines").select(
+                                "*, categories(name)"
+                            ).eq("company_id", selected_org_id)
+                            
+                            if trend_period_type == "Monthly":
+                                trends_query = trends_query.eq("period_year", trend_year)
+                            elif trend_period_type == "Yearly":
+                                trends_query = trends_query.gte("period_year", trend_start_year).lte("period_year", trend_end_year)
+                            else:  # Custom Date Range
+                                st.warning("Custom date range trends require database schema update. Please use Monthly or Yearly for now.")
+                                trends_query = trends_query.eq("period_year", trend_year)
+                            
+                            trends_result = trends_query.execute()
+                            
+                            if trends_result.data:
+                                # Process trends data based on period type
+                                trends_data = []
+                                
+                                if trend_period_type == "Monthly":
+                                    # Group by month for monthly trends
+                                    monthly_data = {}
+                                    for item in trends_result.data:
+                                        month = item.get('period_month', 1)
+                                        amount = float(item.get('amount_planned', 0))
+                                        if month not in monthly_data:
+                                            monthly_data[month] = 0
+                                        monthly_data[month] += amount
+                                    
+                                    month_names = ["January", "February", "March", "April", "May", "June", 
+                                                 "July", "August", "September", "October", "November", "December"]
+                                    
+                                    for month_num, amount in monthly_data.items():
+                                        trends_data.append({
+                                            'Month': month_names[month_num - 1],
+                                            'Budget': amount
+                                        })
+                                
+                                elif trend_period_type == "Yearly":
+                                    # Group by year for yearly trends
+                                    yearly_data = {}
+                                    for item in trends_result.data:
+                                        year = item.get('period_year', 2020)
+                                        amount = float(item.get('amount_planned', 0))
+                                        if year not in yearly_data:
+                                            yearly_data[year] = 0
+                                        yearly_data[year] += amount
+                                    
+                                    for year, amount in yearly_data.items():
+                                        trends_data.append({
+                                            'Year': year,
+                                            'Budget': amount
+                                        })
+                                
+                                else:  # Custom Date Range
+                                    # Group by date range
+                                    total_budget = sum(float(item.get('amount_planned', 0)) for item in trends_result.data)
+                                    trends_data.append({
+                                        'Period': f"{trend_start_date} to {trend_end_date}",
+                                        'Budget': total_budget
+                                    })
+                            
+                            if trends_data:
+                                df_trends = pd.DataFrame(trends_data)
+                                
+                                # Create appropriate chart based on period type
+                                if trend_period_type == "Monthly":
+                                    # Monthly trends - bar chart by month
+                                    fig = px.bar(
+                                        df_trends, 
+                                        x='Month', 
+                                        y='Budget',
+                                        title="Monthly Budget Breakdown",
+                                        labels={'Budget': 'Budget Amount ($)'}
+                                    )
+                                    st.plotly_chart(fig, use_container_width=True)
+                                    
+                                elif trend_period_type == "Yearly":
+                                    # Yearly trends - line chart by year
+                                    fig = px.line(
+                                        df_trends, 
+                                        x='Year', 
+                                        y='Budget',
+                                        title="Yearly Budget Trends",
+                                        labels={'Budget': 'Budget Amount ($)'}
+                                    )
+                                    st.plotly_chart(fig, use_container_width=True)
+                                    
+                                else:  # Custom Date Range
+                                    # Custom range - single bar or summary
+                                    fig = px.bar(
+                                        df_trends, 
+                                        x='Period', 
+                                        y='Budget',
+                                        title="Budget for Custom Date Range",
+                                        labels={'Budget': 'Budget Amount ($)'}
+                                    )
+                                    st.plotly_chart(fig, use_container_width=True)
+                                
+                                # Display summary table
+                                st.subheader("Budget Summary")
+                                st.dataframe(df_trends, use_container_width=True)
+                            else:
+                                st.info("No budget data found for the selected period.")
+                                
+                        except Exception as e:
+                            st.error(f"Error loading budget trends: {str(e)}")
+                
+                with budget_tab4:
+                    st.subheader("📊 Budget Analysis")
+                    
+                    # Analysis period
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        analysis_year = st.selectbox("Analysis Year", range(2020, 2030), index=date.today().year - 2020, key="analysis_year")
+                    
+                    with col2:
+                        analysis_month = st.selectbox("Analysis Month", range(1, 13), index=date.today().month - 1, key="analysis_month")
+                    
+                    try:
+                        # Get budget analysis data
+                        budget_result = db.client.table("budget_lines").select(
+                            "*, categories(name)"
+                        ).eq("company_id", selected_org_id).eq("period_year", analysis_year).eq("period_month", analysis_month).execute()
+                        
+                        budget_lines = budget_result.data if budget_result.data else []
+                        
+                        if budget_lines:
+                            # Calculate analysis metrics
+                            total_budgeted = sum(float(b.get('amount_planned', 0)) for b in budget_lines)
+                            
+                            # Get actual transactions
+                            start_date = date(analysis_year, analysis_month, 1)
+                            if analysis_month == 12:
+                                end_date = date(analysis_year + 1, 1, 1)
+                            else:
+                                end_date = date(analysis_year, analysis_month + 1, 1)
+                            
+                            expense_result = db.client.table("expenses").select("*").eq("organization_id", selected_org_id).gte("transaction_date", start_date.isoformat()).lt("transaction_date", end_date.isoformat()).execute()
+                            
+                            # Calculate actuals by category
+                            actuals_by_category = {}
+                            for expense in expense_result.data:
+                                category_name = expense.get('category', 'Uncategorized')
+                                if category_name not in actuals_by_category:
+                                    actuals_by_category[category_name] = 0
+                                actuals_by_category[category_name] += float(expense.get('amount', 0))
+                            
+                            total_actual = sum(actuals_by_category.values())
+                            total_variance = total_actual - total_budgeted
+                            variance_percentage = (total_variance / total_budgeted * 100) if total_budgeted > 0 else 0
+                            
+                            # Display key metrics
+                            st.subheader("Key Metrics")
+                            
+                            col1, col2, col3, col4 = st.columns(4)
+                            
+                            with col1:
+                                st.metric("Budget Accuracy", f"{100 - abs(variance_percentage):.1f}%")
+                            
+                            with col2:
+                                st.metric("Variance %", f"{variance_percentage:+.1f}%")
+                            
+                            with col3:
+                                st.metric("Total Variance", f"${total_variance:,.2f}")
+                            
+                            with col4:
+                                st.metric("Budget Utilization", f"{(total_actual / total_budgeted * 100):.1f}%")
+                            
+                            # Top variances
+                            st.subheader("Top Variances")
+                            
+                            variance_data = []
+                            for budget in budget_lines:
+                                category_name = budget.get('categories', {}).get('name', 'Unknown')
+                                actual_amount = actuals_by_category.get(category_name, 0)
+                                budgeted_amount = float(budget.get('amount_planned', 0))
+                                variance = actual_amount - budgeted_amount
+                                variance_percentage = (variance / budgeted_amount * 100) if budgeted_amount > 0 else 0
+                                
+                                variance_data.append({
+                                    'Category': category_name,
+                                    'Budgeted': f"${budgeted_amount:,.2f}",
+                                    'Actual': f"${actual_amount:,.2f}",
+                                    'Variance': f"${variance:,.2f}",
+                                    'Variance %': f"{variance_percentage:+.1f}%"
+                                })
+                            
+                            # Sort by absolute variance
+                            variance_data.sort(key=lambda x: abs(float(x['Variance'].replace('$', '').replace(',', ''))), reverse=True)
+                            
+                            # Display top 10 variances
+                            for i, item in enumerate(variance_data[:10]):
+                                st.write(f"**{i+1}. {item['Category']}**")
+                                st.write(f"   Budgeted: {item['Budgeted']}")
+                                st.write(f"   Actual: {item['Actual']}")
+                                st.write(f"   Variance: {item['Variance']} ({item['Variance %']})")
+                                st.write("---")
+                            
+                            # Recommendations
+                            st.subheader("Recommendations")
+                            
+                            recommendations = []
+                            
+                            if variance_percentage > 20:
+                                recommendations.append("⚠️ High budget variance - consider reviewing budget assumptions")
+                            
+                            if variance_percentage < -20:
+                                recommendations.append("✅ Significant under-budget - consider reallocating funds")
+                            
+                            over_budget_categories = [item for item in variance_data if float(item['Variance'].replace('$', '').replace(',', '')) > 0]
+                            if over_budget_categories:
+                                recommendations.append(f"📊 {len(over_budget_categories)} categories are over budget")
+                            
+                            for rec in recommendations:
+                                st.write(rec)
+                                
+                        else:
+                            st.info("No budget data found for the selected period.")
+                            
+                    except Exception as e:
+                        st.error(f"Error loading budget analysis: {str(e)}")
+                        
+            except Exception as e:
+                st.error(f"Error in Budget module: {str(e)}")
+        else:
+            st.warning("Please select an organization first to access budget management.")
+
+    elif selected == "🏗️ CapEx":
+        st.markdown('<h1 class="main-header">🏗️ Capital Expenditure Management</h1>', unsafe_allow_html=True)
+        
+        if st.session_state.get('selected_organization'):
+            try:
+                selected_org_id = st.session_state.selected_organization
+                
+                # CapEx tabs
+                capex_tab1, capex_tab2, capex_tab3 = st.tabs([
+                    "📋 CapEx Items", "➕ Add CapEx", "📈 CapEx Analysis"
+                ])
+                
+                with capex_tab1:
+                    st.subheader("📋 CapEx Items")
+                    
+                    # Filters
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        capex_start_date = st.date_input("Start Date", value=date.today().replace(day=1), key="capex_start_date")
+                    
+                    with col2:
+                        capex_end_date = st.date_input("End Date", value=date.today(), key="capex_end_date")
+                    
+                    with col3:
+                        if st.button("🔄 Refresh", key="capex_refresh"):
+                            st.rerun()
+                    
+                    try:
+                        # Check if capex_items table exists
+                        try:
+                            # Get CapEx items
+                            capex_result = db.client.table("capex_items").select(
+                                "*, properties(name), vendors(name)"
+                            ).eq("company_id", selected_org_id).gte("capex_date", capex_start_date.isoformat()).lte("capex_date", capex_end_date.isoformat()).execute()
+                        except Exception as table_error:
+                            if "Could not find the table" in str(table_error):
+                                st.error("❌ **CapEx table not found in database!**")
+                                st.info("**To fix this:**")
+                                st.markdown("""
+                                1. Go to your Supabase project dashboard
+                                2. Navigate to **SQL Editor**
+                                3. Copy and paste the SQL commands from `database/setup_budget_tables_simple.sql`
+                                4. Click **Run** to execute the script
+                                5. Refresh this page
+                                """)
+                                return
+                            else:
+                                raise table_error
+                        
+                        capex_items = capex_result.data if capex_result.data else []
+                        
+                        if capex_items:
+                            # Display CapEx items
+                            df_capex = pd.DataFrame(capex_items)
+                            
+                            # Format columns
+                            if 'capex_date' in df_capex.columns:
+                                df_capex['capex_date'] = pd.to_datetime(df_capex['capex_date']).dt.strftime('%Y-%m-%d')
+                            
+                            if 'amount' in df_capex.columns:
+                                df_capex['amount'] = df_capex['amount'].apply(lambda x: f"${x:,.2f}")
+                            
+                            # Select columns to display
+                            display_columns = ['capex_date', 'title', 'amount', 'properties', 'vendors', 'description']
+                            available_columns = [col for col in display_columns if col in df_capex.columns]
+                            
+                            st.dataframe(df_capex[available_columns], use_container_width=True)
+                            
+                            # Summary
+                            st.subheader("Summary")
+                            
+                            col1, col2, col3, col4 = st.columns(4)
+                            
+                            total_capex = sum(float(item.get('amount', 0)) for item in capex_items)
+                            avg_capex = total_capex / len(capex_items) if capex_items else 0
+                            max_capex = max(float(item.get('amount', 0)) for item in capex_items) if capex_items else 0
+                            min_capex = min(float(item.get('amount', 0)) for item in capex_items) if capex_items else 0
+                            
+                            with col1:
+                                st.metric("Total CapEx", f"${total_capex:,.2f}")
+                            
+                            with col2:
+                                st.metric("Average CapEx", f"${avg_capex:,.2f}")
+                            
+                            with col3:
+                                st.metric("Largest CapEx", f"${max_capex:,.2f}")
+                            
+                            with col4:
+                                st.metric("Smallest CapEx", f"${min_capex:,.2f}")
+                        else:
+                            st.info("No CapEx items found for the selected period.")
+                            
+                    except Exception as e:
+                        st.error(f"Error loading CapEx items: {str(e)}")
+                
+                with capex_tab2:
+                    st.subheader("➕ Add CapEx Item")
+                    
+                    try:
+                        # Initialize form reset counter
+                        if 'capex_form_reset_counter' not in st.session_state:
+                            st.session_state.capex_form_reset_counter = 0
+                        
+                        
+                        with st.form(f"add_capex_form_{st.session_state.capex_form_reset_counter}"):
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                # Get properties
+                                properties_result = db.client.table("properties").select("id, name").eq("organization_id", selected_org_id).execute()
+                                property_options = {p['name']: p['id'] for p in properties_result.data} if properties_result.data else {}
+                                selected_property = st.selectbox("Property", list(property_options.keys()), key=f"capex_property_{st.session_state.capex_form_reset_counter}")
+                                property_id = property_options.get(selected_property) if selected_property else None
+                                
+                                title = st.text_input("Title", placeholder="e.g., Kitchen Renovation", key=f"capex_title_{st.session_state.capex_form_reset_counter}")
+                                capex_date = st.date_input("Date", value=date.today(), key=f"capex_date_{st.session_state.capex_form_reset_counter}")
+                                amount = st.number_input("Amount", min_value=0.01, step=0.01, key=f"capex_amount_{st.session_state.capex_form_reset_counter}")
+                            
+                            with col2:
+                                # Get vendors
+                                vendors_result = db.client.table("vendors").select("id, name").eq("company_id", selected_org_id).execute()
+                                vendor_options = {v['name']: v['id'] for v in vendors_result.data} if vendors_result.data else {}
+                                vendor_options['None'] = None
+                                selected_vendor = st.selectbox("Vendor (Optional)", list(vendor_options.keys()), key=f"capex_vendor_{st.session_state.capex_form_reset_counter}")
+                                vendor_id = vendor_options.get(selected_vendor) if selected_vendor else None
+                                
+                                description = st.text_area("Description", placeholder="Describe the CapEx item", key=f"capex_description_{st.session_state.capex_form_reset_counter}")
+                                attachment_url = st.text_input("Attachment URL (Optional)", placeholder="Link to receipt or document", key=f"capex_attachment_{st.session_state.capex_form_reset_counter}")
+                            
+                            submitted = st.form_submit_button("Add CapEx Item", type="primary")
+                            
+                            if submitted:
+                                # Validate required fields
+                                if not title or not amount or not property_id:
+                                    st.error("Please fill in all required fields (Title, Amount, and Property).")
+                                else:
+                                    try:
+                                        capex_data = {
+                                            'company_id': selected_org_id,
+                                            'property_id': property_id,
+                                            'title': title,
+                                            'capex_date': capex_date.isoformat(),
+                                            'amount': amount,
+                                            'description': description,
+                                            'vendor_id': vendor_id,
+                                            'attachment_url': attachment_url
+                                        }
+                                        
+                                        result = db.client.table("capex_items").insert(capex_data).execute()
+                                        
+                                        if result.data:
+                                            st.success("CapEx item added successfully!")
+                                            # Clear the form by incrementing reset counter
+                                            st.session_state.capex_form_reset_counter = st.session_state.get('capex_form_reset_counter', 0) + 1
+                                            st.rerun()
+                                        else:
+                                            st.error("Failed to add CapEx item.")
+                                            
+                                    except Exception as e:
+                                        st.error(f"Error adding CapEx item: {str(e)}")
+                    
+                    except Exception as e:
+                        st.error(f"Error loading CapEx form: {str(e)}")
+                
+                with capex_tab3:
+                    st.subheader("📈 CapEx Analysis")
+                    
+                    # Analysis period
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        capex_analysis_start = st.date_input("Analysis Start Date", value=date.today().replace(day=1), key="capex_analysis_start")
+                    
+                    with col2:
+                        capex_analysis_end = st.date_input("Analysis End Date", value=date.today(), key="capex_analysis_end")
+                    
+                    try:
+                        # Get CapEx analysis data
+                        capex_result = db.client.table("capex_items").select(
+                            "*, properties(name), vendors(name)"
+                        ).eq("company_id", selected_org_id).gte("capex_date", capex_analysis_start.isoformat()).lte("capex_date", capex_analysis_end.isoformat()).execute()
+                        
+                        capex_items = capex_result.data if capex_result.data else []
+                        
+                        if capex_items:
+                            # Calculate analysis metrics
+                            total_capex = sum(float(item.get('amount', 0)) for item in capex_items)
+                            avg_capex = total_capex / len(capex_items)
+                            max_capex = max(float(item.get('amount', 0)) for item in capex_items)
+                            min_capex = min(float(item.get('amount', 0)) for item in capex_items)
+                            
+                            # Display key metrics
+                            st.subheader("Key Metrics")
+                            
+                            col1, col2, col3, col4 = st.columns(4)
+                            
+                            with col1:
+                                st.metric("Total CapEx", f"${total_capex:,.2f}")
+                            
+                            with col2:
+                                st.metric("Average CapEx", f"${avg_capex:,.2f}")
+                            
+                            with col3:
+                                st.metric("Largest CapEx", f"${max_capex:,.2f}")
+                            
+                            with col4:
+                                st.metric("Smallest CapEx", f"${min_capex:,.2f}")
+                            
+                            # Monthly trends
+                            st.subheader("Monthly CapEx Trends")
+                            
+                            # Group by month
+                            monthly_capex = {}
+                            for item in capex_items:
+                                month_key = item['capex_date'][:7]  # YYYY-MM
+                                if month_key not in monthly_capex:
+                                    monthly_capex[month_key] = 0
+                                monthly_capex[month_key] += float(item.get('amount', 0))
+                            
+                            if monthly_capex:
+                                df_monthly = pd.DataFrame([
+                                    {'Month': month, 'Amount': amount}
+                                    for month, amount in sorted(monthly_capex.items())
+                                ])
+                                
+                                # Create line chart
+                                fig = px.line(
+                                    df_monthly,
+                                    x='Month',
+                                    y='Amount',
+                                    title="Monthly CapEx Trends",
+                                    labels={'Amount': 'CapEx Amount ($)'}
+                                )
+                                
+                                st.plotly_chart(fig, use_container_width=True)
+                            
+                            # CapEx by property
+                            st.subheader("CapEx by Property")
+                            
+                            # Group by property
+                            property_capex = {}
+                            for item in capex_items:
+                                property_name = item.get('properties', {}).get('name', 'Unknown')
+                                if property_name not in property_capex:
+                                    property_capex[property_name] = 0
+                                property_capex[property_name] += float(item.get('amount', 0))
+                            
+                            if property_capex:
+                                df_property = pd.DataFrame([
+                                    {'Property': property, 'Amount': amount}
+                                    for property, amount in sorted(property_capex.items(), key=lambda x: x[1], reverse=True)
+                                ])
+                                
+                                # Create bar chart
+                                fig_bar = px.bar(
+                                    df_property,
+                                    x='Property',
+                                    y='Amount',
+                                    title="CapEx by Property",
+                                    labels={'Amount': 'CapEx Amount ($)'}
+                                )
+                                
+                                st.plotly_chart(fig_bar, use_container_width=True)
+                        else:
+                            st.info("No CapEx data found for the selected period.")
+                            
+                    except Exception as e:
+                        st.error(f"Error loading CapEx analysis: {str(e)}")
+                        
+            except Exception as e:
+                st.error(f"Error in CapEx module: {str(e)}")
+        else:
+            st.warning("Please select an organization first to access CapEx management.")
+
+    elif selected == "👥 Vendors":
+        st.markdown('<h1 class="main-header">👥 Vendor Management</h1>', unsafe_allow_html=True)
+        
+        if st.session_state.get('selected_organization'):
+            try:
+                selected_org_id = st.session_state.selected_organization
+                
+                # Vendor tabs
+                vendor_tab1, vendor_tab2, vendor_tab3 = st.tabs([
+                    "📋 Vendor Directory", "➕ Add Vendor", "📊 Vendor Analysis"
+                ])
+                
+                with vendor_tab1:
+                    st.subheader("📋 Vendor Directory")
+                    
+                    try:
+                        # Get vendors
+                        vendors_result = db.client.table("vendors").select("*").eq("company_id", selected_org_id).execute()
+                        vendors = vendors_result.data if vendors_result.data else []
+                        
+                        if vendors:
+                            # Display vendors
+                            df_vendors = pd.DataFrame(vendors)
+                            
+                            # Format columns
+                            if 'created_at' in df_vendors.columns:
+                                df_vendors['created_at'] = pd.to_datetime(df_vendors['created_at']).dt.strftime('%Y-%m-%d')
+                            
+                            # Select columns to display
+                            display_columns = ['name', 'contact_email', 'phone', 'notes', 'created_at']
+                            available_columns = [col for col in display_columns if col in df_vendors.columns]
+                            
+                            st.dataframe(df_vendors[available_columns], use_container_width=True)
+                            
+                            # Vendor summary
+                            st.subheader("Vendor Summary")
+                            
+                            col1, col2, col3 = st.columns(3)
+                            
+                            with col1:
+                                st.metric("Total Vendors", len(vendors))
+                            
+                            with col2:
+                                vendors_with_email = len([v for v in vendors if v.get('contact_email')])
+                                st.metric("Vendors with Email", vendors_with_email)
+                            
+                            with col3:
+                                vendors_with_phone = len([v for v in vendors if v.get('phone')])
+                                st.metric("Vendors with Phone", vendors_with_phone)
+                        else:
+                            st.info("No vendors found. Add a vendor to get started.")
+                            
+                    except Exception as e:
+                        st.error(f"Error loading vendor directory: {str(e)}")
+                
+                with vendor_tab2:
+                    st.subheader("➕ Add New Vendor")
+                    
+                    # Initialize form reset counter
+                    if 'vendor_form_reset_counter' not in st.session_state:
+                        st.session_state.vendor_form_reset_counter = 0
+                    
+                    with st.form(f"add_vendor_form_{st.session_state.vendor_form_reset_counter}"):
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            name = st.text_input("Vendor Name", placeholder="e.g., ABC HVAC Services", key=f"vendor_name_{st.session_state.vendor_form_reset_counter}")
+                            contact_email = st.text_input("Contact Email", placeholder="e.g., service@abchvac.com", key=f"vendor_email_{st.session_state.vendor_form_reset_counter}")
+                        
+                        with col2:
+                            phone = st.text_input("Phone", placeholder="e.g., (555) 123-4567", key=f"vendor_phone_{st.session_state.vendor_form_reset_counter}")
+                            notes = st.text_area("Notes", placeholder="Additional information about the vendor", key=f"vendor_notes_{st.session_state.vendor_form_reset_counter}")
+                        
+                        submitted = st.form_submit_button("Add Vendor", type="primary")
+                        
+                        if submitted:
+                            try:
+                                vendor_data = {
+                                    'company_id': selected_org_id,
+                                    'name': name,
+                                    'contact_email': contact_email,
+                                    'phone': phone,
+                                    'notes': notes
+                                }
+                                
+                                result = db.client.table("vendors").insert(vendor_data).execute()
+                                
+                                if result.data:
+                                    st.success("Vendor added successfully!")
+                                    # Clear the form by incrementing reset counter
+                                    st.session_state.vendor_form_reset_counter = st.session_state.get('vendor_form_reset_counter', 0) + 1
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to add vendor.")
+                                    
+                            except Exception as e:
+                                st.error(f"Error adding vendor: {str(e)}")
+                
+                with vendor_tab3:
+                    st.subheader("📊 Vendor Analysis")
+                    
+                    # Analysis period
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        vendor_analysis_start = st.date_input("Analysis Start Date", value=date.today().replace(day=1), key="vendor_analysis_start")
+                    
+                    with col2:
+                        vendor_analysis_end = st.date_input("Analysis End Date", value=date.today(), key="vendor_analysis_end")
+                    
+                    try:
+                        # Get expense transactions for vendor analysis
+                        expense_result = db.client.table("expenses").select(
+                            "*, vendors(name)"
+                        ).eq("organization_id", selected_org_id).gte("transaction_date", vendor_analysis_start.isoformat()).lte("transaction_date", vendor_analysis_end.isoformat()).execute()
+                        
+                        expenses = expense_result.data if expense_result.data else []
+                        
+                        if expenses:
+                            # Calculate vendor metrics
+                            vendor_metrics = {}
+                            
+                            for expense in expenses:
+                                vendor_name = expense.get('vendors', {}).get('name', 'Unknown')
+                                if vendor_name not in vendor_metrics:
+                                    vendor_metrics[vendor_name] = {
+                                        'total_spend': 0,
+                                        'transaction_count': 0,
+                                        'avg_transaction': 0
+                                    }
+                                
+                                vendor_metrics[vendor_name]['total_spend'] += float(expense.get('amount', 0))
+                                vendor_metrics[vendor_name]['transaction_count'] += 1
+                            
+                            # Calculate averages
+                            for vendor_name, metrics in vendor_metrics.items():
+                                if metrics['transaction_count'] > 0:
+                                    metrics['avg_transaction'] = metrics['total_spend'] / metrics['transaction_count']
+                            
+                            # Display vendor metrics
+                            st.subheader("Vendor Metrics")
+                            
+                            vendor_list = []
+                            for vendor_name, metrics in vendor_metrics.items():
+                                vendor_list.append({
+                                    'Vendor': vendor_name,
+                                    'Total Spend': f"${metrics['total_spend']:,.2f}",
+                                    'Transactions': metrics['transaction_count'],
+                                    'Avg Transaction': f"${metrics['avg_transaction']:,.2f}"
+                                })
+                            
+                            df_vendor_metrics = pd.DataFrame(vendor_list)
+                            st.dataframe(df_vendor_metrics, use_container_width=True)
+                            
+                            # Top vendors by spend
+                            st.subheader("Top Vendors by Spend")
+                            
+                            # Sort by total spend
+                            sorted_vendors = sorted(vendor_metrics.items(), key=lambda x: x[1]['total_spend'], reverse=True)[:10]
+                            
+                            if sorted_vendors:
+                                df_top = pd.DataFrame([
+                                    {'Vendor': vendor, 'Total Spend': metrics['total_spend']}
+                                    for vendor, metrics in sorted_vendors
+                                ])
+                                
+                                # Create bar chart
+                                fig = px.bar(
+                                    df_top,
+                                    x='Vendor',
+                                    y='Total Spend',
+                                    title="Top Vendors by Spend",
+                                    labels={'Total Spend': 'Total Spend ($)'}
+                                )
+                                
+                                fig.update_xaxes(tickangle=45)
+                                st.plotly_chart(fig, use_container_width=True)
+                            
+                            # Vendor concentration analysis
+                            st.subheader("Vendor Concentration Analysis")
+                            
+                            total_spend = sum(metrics['total_spend'] for metrics in vendor_metrics.values())
+                            
+                            # Calculate concentration metrics
+                            top_5_vendors = sorted(vendor_metrics.items(), key=lambda x: x[1]['total_spend'], reverse=True)[:5]
+                            top_5_spend = sum(metrics['total_spend'] for _, metrics in top_5_vendors)
+                            concentration_percentage = (top_5_spend / total_spend * 100) if total_spend > 0 else 0
+                            
+                            col1, col2, col3 = st.columns(3)
+                            
+                            with col1:
+                                st.metric("Top 5 Vendors %", f"{concentration_percentage:.1f}%")
+                            
+                            with col2:
+                                st.metric("Total Vendors", len(vendor_metrics))
+                            
+                            with col3:
+                                st.metric("Total Spend", f"${total_spend:,.2f}")
+                            
+                            # Concentration risk assessment
+                            if concentration_percentage > 80:
+                                st.warning("⚠️ High vendor concentration risk: Top 5 vendors account for more than 80% of spend")
+                            elif concentration_percentage > 60:
+                                st.info("ℹ️ Moderate vendor concentration: Top 5 vendors account for more than 60% of spend")
+                            else:
+                                st.success("✅ Low vendor concentration risk")
+                        else:
+                            st.info("No expense data found for the selected period.")
+                            
+                    except Exception as e:
+                        st.error(f"Error loading vendor analysis: {str(e)}")
+                        
+            except Exception as e:
+                st.error(f"Error in Vendor module: {str(e)}")
+        else:
+            st.warning("Please select an organization first to access vendor management.")
+
     elif selected == "AI Insights":
         st.markdown('<h1 class="main-header">🤖 AI-Powered Insights</h1>', unsafe_allow_html=True)
         st.info("AI insights functionality - Sign up to use with your own data!")
 
 def main():
     """Main application function"""
-    initialize_session_state()
+    # Set default navigation state
+    set_default_navigation()
     
-    if st.session_state.authenticated:
+    # Initialize session management
+    SessionManager.initialize_session()
+    
+    if SessionManager.is_authenticated():
         show_main_app()
     else:
         show_auth_page()
