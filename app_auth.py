@@ -1885,7 +1885,7 @@ def show_main_app():
                                         st.write(f"**Property:** All Properties")
                                     
                                     # Show budget status
-                                    analysis = db.get_budget_analysis(budget.id)
+                                    analysis = db.get_budget_analysis(budget.id, budget.start_date, budget.end_date)
                                     if analysis:
                                         status_color = "🔴" if analysis['is_over_budget'] else "🟢"
                                         utilization = (analysis['total_actual'] / analysis['total_budgeted'] * 100) if analysis['total_budgeted'] > 0 else 0
@@ -1913,7 +1913,7 @@ def show_main_app():
                             over_budget_count = 0
                             
                             for budget in filtered_budgets:
-                                analysis = db.get_budget_analysis(budget.id)
+                                analysis = db.get_budget_analysis(budget.id, budget.start_date, budget.end_date)
                                 if analysis:
                                     total_actual += analysis['total_actual']
                                     if analysis['is_over_budget']:

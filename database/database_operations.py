@@ -379,16 +379,21 @@ class DatabaseOperations:
             
             budget_lines = self.get_budget_lines(budget_id)
             
+            # Use budget's own dates if no dates provided
+            if start_date is None:
+                start_date = budget.start_date
+            if end_date is None:
+                end_date = budget.end_date
+            
             # Get actual expenses for the budget period
             if budget.scope == BudgetScope.PROPERTY and budget.property_id:
-                expenses_query = self.client.table("expenses").select("amount, expense_type").eq("property_id", budget.property_id)
+                expenses_query = self.client.table("expenses").select("amount, expense_type, transaction_date").eq("property_id", budget.property_id)
             else:
-                expenses_query = self.client.table("expenses").select("amount, expense_type").eq("organization_id", budget.organization_id)
+                expenses_query = self.client.table("expenses").select("amount, expense_type, transaction_date").eq("organization_id", budget.organization_id)
             
-            if start_date:
-                expenses_query = expenses_query.gte("transaction_date", start_date.isoformat())
-            if end_date:
-                expenses_query = expenses_query.lte("transaction_date", end_date.isoformat())
+            # Always filter by the budget period
+            expenses_query = expenses_query.gte("transaction_date", start_date.isoformat())
+            expenses_query = expenses_query.lte("transaction_date", end_date.isoformat())
             
             expenses_result = expenses_query.execute()
             
