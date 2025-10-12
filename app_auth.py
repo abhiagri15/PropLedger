@@ -1,16 +1,15 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, date, timedelta
+import pytz
 from streamlit_option_menu import option_menu
 from database.supabase_client import get_supabase_client
 from database.database_operations import DatabaseOperations
-from database.models import Property, Income, Expense, PropertyType, IncomeType, ExpenseType, Organization, UserOrganization
+from database.models import Property, Income, Expense, PropertyType, IncomeType, ExpenseType, Organization, UserOrganization, Budget, BudgetLine, BudgetPeriod, BudgetScope
 from llm.llm_insights import LLMInsights
 from services.geocoding import geocoding_service
 import config
-import os
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -28,11 +27,11 @@ st.set_page_config(
 st.markdown("""
 <style>
     .main-header {
-        font-size: 3rem;
+        font-size: 2.5rem;
         font-weight: bold;
         color: #1f77b4;
         text-align: center;
-        margin-bottom: 2rem;
+        margin-bottom: 0.5rem;
     }
     .auth-container {
         max-width: 400px;
@@ -341,8 +340,8 @@ def show_main_app():
         # Navigation - Most important section
         selected = option_menu(
             menu_title="📋 Navigation",
-            options=["Organizations Dashboard", "Dashboard", "Properties", "Income", "Expenses", "Analytics", "Rent Reminders", "Reports", "AI Insights"],
-            icons=["building", "speedometer2", "house", "cash-coin", "receipt", "graph-up", "bell", "file-earmark-text", "robot"],
+            options=["Organizations Dashboard", "Dashboard", "Properties", "Income", "Expenses", "Budget Planner", "Analytics", "Rent Reminders", "Reports", "AI Insights"],
+            icons=["building", "speedometer2", "house", "cash-coin", "receipt", "calculator", "graph-up", "bell", "file-earmark-text", "robot"],
             menu_icon="cast",
             default_index=1,
             key="main_navigation",
@@ -1437,6 +1436,506 @@ def show_main_app():
                             st.rerun()
                         else:
                             st.error("Failed to add expense record. Please try again.")
+            else:
+                st.info(f"No properties found for {org_name}. Please add a property first.")
+    
+    elif selected == "Budget Planner":
+        st.markdown('### 🧮 Budget Planner')
+        
+        # Get current organization and properties
+        selected_org_id = st.session_state.get('selected_organization')
+        if not selected_org_id:
+            st.warning("Please select an organization first.")
+            return
+        
+        # Get organization name
+        org = db.get_organization_by_id(selected_org_id)
+        org_name = org.name if org else "Unknown Organization"
+        
+        # Get organization properties
+        org_properties = db.get_properties_by_organization(selected_org_id)
+        
+        # Budget Planner sub-menu
+        budget_tabs = st.tabs(["📊 Budget Overview", "➕ Create Budget", "📈 Budget Analysis", "⚙️ Manage Budgets"])
+        
+        with budget_tabs[0]:  # Budget Overview
+            st.subheader("Budget Overview")
+            
+            if org_properties:
+                # Get all budgets for the organization
+                budgets = db.get_budgets_by_organization(selected_org_id)
+                
+                if budgets:
+                    # Display budgets in a nice format
+                    for budget in budgets:
+                        with st.expander(f"📋 {budget.name} - {budget.period.title()}", expanded=False):
+                            col1, col2, col3 = st.columns(3)
+                            
+                            with col1:
+                                st.metric("Budget Amount", f"${budget.budget_amount:,.2f}")
+                                st.write(f"**Scope:** {budget.scope.title()}")
+                            
+                            with col2:
+                                st.write(f"**Period:** {budget.start_date.strftime('%Y-%m-%d')} to {budget.end_date.strftime('%Y-%m-%d')}")
+                                st.write(f"**Status:** {'Active' if budget.is_active else 'Inactive'}")
+                            
+                            with col3:
+                                if budget.property_id:
+                                    property_name = next((p.name for p in org_properties if p.id == budget.property_id), "Unknown Property")
+                                    st.write(f"**Property:** {property_name}")
+                                else:
+                                    st.write("**Scope:** All Properties")
+                                
+                                # Quick analysis
+                                analysis = db.get_budget_analysis(budget.id, budget.start_date, budget.end_date)
+                                if analysis:
+                                    variance_color = "red" if analysis['is_over_budget'] else "green"
+                                    st.markdown(f"**Variance:** <span style='color: {variance_color}'>{analysis['variance_percentage']:.1f}%</span>", unsafe_allow_html=True)
+                else:
+                    st.info("No budgets created yet. Create your first budget in the 'Create Budget' tab.")
+            else:
+                st.info(f"No properties found for {org_name}. Please add a property first.")
+        
+        with budget_tabs[1]:  # Create Budget
+            st.subheader("Create New Budget")
+            
+            if org_properties:
+                # Initialize session state for form
+                if 'budget_period' not in st.session_state:
+                    st.session_state.budget_period = "monthly"
+                
+                # Check if form was just submitted
+                if 'budget_created' in st.session_state and st.session_state.budget_created:
+                    st.success("✅ Budget created successfully!")
+                    st.session_state.budget_created = False
+                    st.rerun()
+                
+                with st.form("create_budget_form", clear_on_submit=True):
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        budget_name = st.text_input("Budget Name", placeholder="e.g., Q1 2024 Maintenance Budget", key="budget_name")
+                        budget_description = st.text_area("Description", placeholder="Optional description", key="budget_description")
+                        budget_amount = st.number_input("Total Budget Amount", min_value=0.0, step=100.0, format="%.2f", key="budget_amount")
+                    
+                    with col2:
+                        # Merged Property selection with "All Properties" option
+                        property_options = ["All Properties"] + [f"{prop.name} ({prop.address})" for prop in org_properties]
+                        selected_property_option = st.selectbox("Properties", property_options, key="selected_property")
+                        
+                        if selected_property_option == "All Properties":
+                            budget_scope = "organization"
+                            property_id = None
+                        else:
+                            budget_scope = "property"
+                            # Find the selected property
+                            selected_property = next((prop for prop in org_properties if f"{prop.name} ({prop.address})" == selected_property_option), None)
+                            property_id = selected_property.id if selected_property else None
+                        
+                        budget_period = st.selectbox("Budget Period", ["monthly", "yearly", "custom"], 
+                                                   format_func=lambda x: x.title(),
+                                                   key="budget_period_select")
+                    
+                    # Date range selection based on period
+                    current_date = datetime.now()
+                    current_year = current_date.year
+                    current_month = current_date.month
+                    
+                    st.markdown("### 📅 Date Range")
+                    
+                    if budget_period == "monthly":
+                        # Show year and month for monthly budgets
+                        col_year, col_month = st.columns(2)
+                        with col_year:
+                            budget_year = st.selectbox("Year", range(2020, 2030), index=current_year - 2020, key="monthly_year")
+                        with col_month:
+                            month_names = ["January", "February", "March", "April", "May", "June",
+                                         "July", "August", "September", "October", "November", "December"]
+                            budget_month = st.selectbox("Month", month_names, index=current_month - 1, key="monthly_month")
+                            budget_month_num = month_names.index(budget_month) + 1  # Convert month name to number
+                        start_date = datetime(budget_year, budget_month_num, 1)
+                        # Get last day of the month
+                        if budget_month_num == 12:
+                            end_date = datetime(budget_year + 1, 1, 1) - timedelta(days=1)
+                        else:
+                            end_date = datetime(budget_year, budget_month_num + 1, 1) - timedelta(days=1)
+                    elif budget_period == "yearly":
+                        # Show only year for yearly budgets
+                        budget_year = st.selectbox("Year", range(2020, 2030), index=current_year - 2020, key="yearly_year")
+                        start_date = datetime(budget_year, 1, 1)
+                        end_date = datetime(budget_year, 12, 31)
+                    else:  # custom
+                        # Show date range picker for custom budgets
+                        col_start, col_end = st.columns(2)
+                        with col_start:
+                            start_date = st.date_input("Start Date", value=current_date.date(), key="custom_start")
+                        with col_end:
+                            end_date = st.date_input("End Date", value=current_date.date(), key="custom_end")
+                        start_date = datetime.combine(start_date, datetime.min.time())
+                        end_date = datetime.combine(end_date, datetime.max.time())
+                    
+                    # Display selected date range
+                    if budget_period == "monthly":
+                        month_names = ["January", "February", "March", "April", "May", "June",
+                                     "July", "August", "September", "October", "November", "December"]
+                        st.info(f"📅 **Selected Period:** {month_names[budget_month_num-1]} {budget_year}")
+                    elif budget_period == "yearly":
+                        st.info(f"📅 **Selected Period:** {budget_year} (Full Year)")
+                    else:
+                        st.info(f"📅 **Selected Period:** {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
+                    
+                    # Create Budget button
+                    submitted = st.form_submit_button("Create Budget", type="primary", use_container_width=True)
+                    
+                    if submitted:
+                        if budget_name and budget_amount > 0:
+                            # Create budget
+                            budget = Budget(
+                                organization_id=selected_org_id,
+                                property_id=property_id,
+                                user_id=st.session_state.user.id,
+                                name=budget_name,
+                                description=budget_description,
+                                budget_amount=budget_amount,
+                                period=budget_period,
+                                scope=budget_scope,
+                                start_date=start_date,
+                                end_date=end_date
+                            )
+                            
+                            created_budget = db.create_budget(budget)
+                            if created_budget:
+                                st.session_state.budget_created = True
+                                st.rerun()
+                            else:
+                                st.error("Failed to create budget. Please try again.")
+                        else:
+                            st.error("Please fill in all required fields.")
+            else:
+                st.info(f"No properties found for {org_name}. Please add a property first.")
+        
+        with budget_tabs[2]:  # Budget Analysis
+            st.subheader("📊 Budget Analysis Dashboard")
+            
+            if org_properties:
+                # Get all budgets for analysis
+                budgets = db.get_budgets_by_organization(selected_org_id)
+                
+                if budgets:
+                    # Budget selector and filters
+                    col1, col2, col3 = st.columns([2, 1, 1])
+                    
+                    with col1:
+                        budget_options = {f"{b.name} ({b.period.title()})": b for b in budgets}
+                        selected_budget_name = st.selectbox("Select Budget for Analysis", list(budget_options.keys()))
+                    
+                    with col2:
+                        analysis_period = st.selectbox("Analysis Period", ["Current Period", "Custom Range"], key="analysis_period")
+                    
+                    with col3:
+                        if analysis_period == "Custom Range":
+                            custom_start = st.date_input("Start Date", value=date.today(), key="custom_analysis_start")
+                            custom_end = st.date_input("End Date", value=date.today(), key="custom_analysis_end")
+                        else:
+                            custom_start = custom_end = None
+                    
+                    if selected_budget_name:
+                        selected_budget = budget_options[selected_budget_name]
+                        
+                        # Determine analysis date range
+                        if analysis_period == "Current Period":
+                            analysis_start = selected_budget.start_date
+                            analysis_end = selected_budget.end_date
+                        else:
+                            analysis_start = datetime.combine(custom_start, datetime.min.time())
+                            analysis_end = datetime.combine(custom_end, datetime.max.time())
+                        
+                        # Get budget analysis
+                        try:
+                            analysis = db.get_budget_analysis(selected_budget.id, analysis_start, analysis_end)
+                        except Exception as e:
+                            st.error(f"Error loading budget analysis: {str(e)}")
+                            analysis = None
+                        
+                        if analysis:
+                            # Key Metrics Dashboard
+                            st.markdown("### 📈 Key Metrics")
+                            col1, col2, col3, col4, col5 = st.columns(5)
+                            
+                            with col1:
+                                st.metric("Total Budgeted", f"${analysis['total_budgeted']:,.2f}", 
+                                        delta=None, delta_color="normal")
+                            
+                            with col2:
+                                st.metric("Total Actual", f"${analysis['total_actual']:,.2f}", 
+                                        delta=f"{analysis['variance_percentage']:+.1f}%", 
+                                        delta_color="inverse" if analysis['is_over_budget'] else "normal")
+                            
+                            with col3:
+                                st.metric("Variance", f"${analysis['variance']:,.2f}", 
+                                        delta=f"{analysis['variance_percentage']:+.1f}%", 
+                                        delta_color="inverse" if analysis['is_over_budget'] else "normal")
+                            
+                            with col4:
+                                remaining_budget = analysis['total_budgeted'] - analysis['total_actual']
+                                st.metric("Remaining Budget", f"${remaining_budget:,.2f}", 
+                                        delta=None, delta_color="normal")
+                            
+                            with col5:
+                                status = "Over Budget" if analysis['is_over_budget'] else "Under Budget"
+                                st.metric("Status", status, delta=None, delta_color="normal")
+                            
+                            
+                            # Budget Performance Summary with better layout
+                            st.markdown("### 📋 Budget Performance Summary")
+                            
+                            # Create two-column layout for better space utilization
+                            col1, col2 = st.columns([1, 1])
+                            
+                            with col1:
+                                st.markdown("#### 💰 Financial Overview")
+                                performance_data = {
+                                    'Metric': [
+                                        'Total Budget Allocated',
+                                        'Actual Spending to Date',
+                                        'Remaining Budget',
+                                        'Budget Utilization',
+                                        'Variance Amount',
+                                        'Budget Status'
+                                    ],
+                                    'Value': [
+                                        f"${analysis['total_budgeted']:,.2f}",
+                                        f"${analysis['total_actual']:,.2f}",
+                                        f"${analysis['total_budgeted'] - analysis['total_actual']:,.2f}",
+                                        f"{(analysis['total_actual'] / analysis['total_budgeted'] * 100):.1f}%" if analysis['total_budgeted'] > 0 else "0%",
+                                        f"${analysis['variance']:+,.2f}",
+                                        '⚠️ Over Budget' if analysis['is_over_budget'] else '✅ On Track'
+                                    ]
+                                }
+                                
+                                df_performance = pd.DataFrame(performance_data)
+                                st.dataframe(df_performance, use_container_width=True, hide_index=True)
+                            
+                            with col2:
+                                st.markdown("#### 📊 Quick Insights")
+                                
+                                # Calculate some quick insights
+                                utilization_percent = (analysis['total_actual'] / analysis['total_budgeted'] * 100) if analysis['total_budgeted'] > 0 else 0
+                                remaining_percent = 100 - utilization_percent
+                                
+                                # Progress bar for budget utilization
+                                st.markdown("**Budget Utilization Progress:**")
+                                st.progress(utilization_percent / 100)
+                                st.caption(f"{utilization_percent:.1f}% used, {remaining_percent:.1f}% remaining")
+                                
+                                # Status indicators
+                                st.markdown("**Status Indicators:**")
+                                
+                                if analysis['is_over_budget']:
+                                    st.error(f"⚠️ **Over Budget by ${abs(analysis['variance']):,.2f}**")
+                                else:
+                                    st.success(f"✅ **Under Budget by ${abs(analysis['variance']):,.2f}**")
+                                
+                                # Spending rate
+                                if analysis['total_actual'] > 0:
+                                    daily_average = analysis['total_actual'] / 30  # Assuming 30 days
+                                    st.info(f"📈 **Daily Average Spending: ${daily_average:,.2f}**")
+                                
+                                # Budget health
+                                if utilization_percent < 50:
+                                    st.success("🟢 **Budget Health: Excellent**")
+                                elif utilization_percent < 80:
+                                    st.warning("🟡 **Budget Health: Good**")
+                                else:
+                                    st.error("🔴 **Budget Health: Needs Attention**")
+                            
+                            # Category Breakdown (if available)
+                            if analysis['actual_by_category']:
+                                st.markdown("### 🏷️ Spending by Category")
+                                
+                                category_data = []
+                                for category, amount in analysis['actual_by_category'].items():
+                                    category_data.append({
+                                        'Category': category.title(),
+                                        'Amount': f"${amount:,.2f}",
+                                        'Percentage': f"{(amount / analysis['total_actual'] * 100):.1f}%" if analysis['total_actual'] > 0 else "0%"
+                                    })
+                                
+                                if category_data:
+                                    df_categories = pd.DataFrame(category_data)
+                                    st.dataframe(df_categories, use_container_width=True, hide_index=True)
+                                    
+                                    # Category pie chart
+                                    fig_pie = go.Figure(data=[go.Pie(
+                                        labels=[item['Category'] for item in category_data],
+                                        values=[float(item['Amount'].replace('$', '').replace(',', '')) for item in category_data],
+                                        hole=0.3
+                                    )])
+                                    
+                                    fig_pie.update_layout(
+                                        title="Spending Distribution by Category",
+                                        height=400
+                                    )
+                                    
+                                    st.plotly_chart(fig_pie, use_container_width=True)
+                else:
+                    st.info("No budgets available for analysis. Create a budget first.")
+            else:
+                st.info(f"No properties found for {org_name}. Please add a property first.")
+        
+        with budget_tabs[3]:  # Manage Budgets
+            st.subheader("Manage Budgets")
+            
+            if org_properties:
+                # Filter controls
+                st.markdown("### 🔍 Filter Budgets")
+                
+                col1, col2, col3 = st.columns([2, 2, 2])
+                
+                with col1:
+                    # Property filter
+                    property_options = ["All Properties"] + [prop.name for prop in org_properties]
+                    selected_property_filter = st.selectbox(
+                        "Select Property",
+                        property_options,
+                        key="manage_budget_property_filter"
+                    )
+                
+                with col2:
+                    # Date range filter
+                    date_filter_type = st.selectbox(
+                        "Date Filter Type",
+                        ["All Time", "Custom Range", "This Year", "This Month"],
+                        key="manage_budget_date_filter_type"
+                    )
+                
+                with col3:
+                    # Custom date range (only show if Custom Range is selected)
+                    if date_filter_type == "Custom Range":
+                        start_date_filter = st.date_input(
+                            "Start Date",
+                            value=datetime.now().date() - timedelta(days=365),
+                            key="manage_budget_start_date"
+                        )
+                        end_date_filter = st.date_input(
+                            "End Date",
+                            value=datetime.now().date(),
+                            key="manage_budget_end_date"
+                        )
+                    else:
+                        start_date_filter = None
+                        end_date_filter = None
+                
+                # Get all budgets
+                all_budgets = db.get_budgets_by_organization(selected_org_id)
+                
+                if all_budgets:
+                    # Apply filters
+                    filtered_budgets = []
+                    
+                    for budget in all_budgets:
+                        # Property filter
+                        if selected_property_filter != "All Properties":
+                            if budget.property_id:
+                                property_name = next((p.name for p in org_properties if p.id == budget.property_id), "Unknown Property")
+                                if property_name != selected_property_filter:
+                                    continue
+                            else:
+                                continue  # Organization-wide budget doesn't match property filter
+                        elif budget.property_id is None and selected_property_filter != "All Properties":
+                            continue  # Organization-wide budget when specific property is selected
+                        
+                        # Date filter
+                        if date_filter_type == "All Time":
+                            pass  # Include all budgets
+                        elif date_filter_type == "This Year":
+                            current_year = datetime.now().year
+                            if budget.start_date.year != current_year:
+                                continue
+                        elif date_filter_type == "This Month":
+                            current_date = datetime.now()
+                            if budget.start_date.year != current_date.year or budget.start_date.month != current_date.month:
+                                continue
+                        elif date_filter_type == "Custom Range" and start_date_filter and end_date_filter:
+                            budget_start = budget.start_date.date()
+                            budget_end = budget.end_date.date()
+                            if not (budget_start <= end_date_filter and budget_end >= start_date_filter):
+                                continue
+                        
+                        filtered_budgets.append(budget)
+                    
+                    # Display filtered budgets
+                    if filtered_budgets:
+                        st.markdown(f"### 📋 Found {len(filtered_budgets)} Budget(s)")
+                        
+                        for budget in filtered_budgets:
+                            with st.expander(f"📋 {budget.name} - {budget.period.title()}", expanded=False):
+                                col1, col2, col3 = st.columns([2, 2, 1])
+                                
+                                with col1:
+                                    st.write(f"**Amount:** ${budget.budget_amount:,.2f}")
+                                    st.write(f"**Period:** {budget.start_date.strftime('%Y-%m-%d')} to {budget.end_date.strftime('%Y-%m-%d')}")
+                                    st.write(f"**Scope:** {budget.scope.title()}")
+                                
+                                with col2:
+                                    if budget.property_id:
+                                        property_name = next((p.name for p in org_properties if p.id == budget.property_id), "Unknown Property")
+                                        st.write(f"**Property:** {property_name}")
+                                    else:
+                                        st.write(f"**Property:** All Properties")
+                                    
+                                    # Show budget status
+                                    analysis = db.get_budget_analysis(budget.id)
+                                    if analysis:
+                                        status_color = "🔴" if analysis['is_over_budget'] else "🟢"
+                                        utilization = (analysis['total_actual'] / analysis['total_budgeted'] * 100) if analysis['total_budgeted'] > 0 else 0
+                                        st.write(f"**Status:** {status_color} {utilization:.1f}% utilized")
+                                        st.write(f"**Actual:** ${analysis['total_actual']:,.2f} / ${analysis['total_budgeted']:,.2f}")
+                                
+                                with col3:
+                                    if st.button(f"🗑️ Delete", key=f"delete_budget_{budget.id}", type="secondary"):
+                                        if db.delete_budget(budget.id):
+                                            st.success("Budget deleted successfully!")
+                                            st.rerun()
+                                        else:
+                                            st.error("Failed to delete budget.")
+                                    
+                                    if st.button(f"✏️ Edit", key=f"edit_budget_{budget.id}", type="primary"):
+                                        st.session_state[f"edit_budget_{budget.id}"] = True
+                                        st.rerun()
+                        
+                        # Summary statistics
+                        if len(filtered_budgets) > 1:
+                            st.markdown("### 📊 Summary Statistics")
+                            
+                            total_budgeted = sum(budget.budget_amount for budget in filtered_budgets)
+                            total_actual = 0
+                            over_budget_count = 0
+                            
+                            for budget in filtered_budgets:
+                                analysis = db.get_budget_analysis(budget.id)
+                                if analysis:
+                                    total_actual += analysis['total_actual']
+                                    if analysis['is_over_budget']:
+                                        over_budget_count += 1
+                            
+                            col1, col2, col3, col4 = st.columns(4)
+                            
+                            with col1:
+                                st.metric("Total Budgets", len(filtered_budgets))
+                            
+                            with col2:
+                                st.metric("Total Budgeted", f"${total_budgeted:,.2f}")
+                            
+                            with col3:
+                                st.metric("Total Actual", f"${total_actual:,.2f}")
+                            
+                            with col4:
+                                st.metric("Over Budget", f"{over_budget_count}")
+                    else:
+                        st.info("No budgets match the selected filter criteria.")
+                else:
+                    st.info("No budgets to manage. Create a budget first.")
             else:
                 st.info(f"No properties found for {org_name}. Please add a property first.")
     

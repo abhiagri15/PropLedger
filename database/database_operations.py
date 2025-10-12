@@ -1,5 +1,5 @@
 from database.supabase_client import get_supabase_client
-from database.models import Property, Income, Expense, Category, Organization, UserOrganization
+from database.models import Property, Income, Expense, Category, Organization, UserOrganization, Budget, BudgetLine, BudgetPeriod, BudgetScope
 from typing import List, Optional
 import streamlit as st
 from datetime import datetime
@@ -255,3 +255,172 @@ class DatabaseOperations:
         except Exception as e:
             st.error(f"Error calculating financial summary: {str(e)}")
             return {'total_income': 0, 'total_expenses': 0, 'net_income': 0, 'roi': 0}
+    
+    # Budget Operations
+    def create_budget(self, budget: Budget) -> Optional[Budget]:
+        """Create a new budget"""
+        try:
+            budget_dict = budget.dict(exclude={'id', 'created_at', 'updated_at'})
+            budget_dict['start_date'] = budget_dict['start_date'].isoformat()
+            budget_dict['end_date'] = budget_dict['end_date'].isoformat()
+            
+            result = self.client.table("budgets").insert(budget_dict).execute()
+            if result.data:
+                return Budget(**result.data[0])
+            return None
+        except Exception as e:
+            st.error(f"Error creating budget: {str(e)}")
+            return None
+    
+    def get_budgets_by_organization(self, organization_id: int) -> List[Budget]:
+        """Get all budgets for an organization"""
+        try:
+            result = self.client.table("budgets").select("*").eq("organization_id", organization_id).order("created_at", desc=True).execute()
+            return [Budget(**budget) for budget in result.data]
+        except Exception as e:
+            st.error(f"Error fetching budgets: {str(e)}")
+            return []
+    
+    def get_budgets_by_property(self, property_id: int) -> List[Budget]:
+        """Get all budgets for a specific property"""
+        try:
+            result = self.client.table("budgets").select("*").eq("property_id", property_id).order("created_at", desc=True).execute()
+            return [Budget(**budget) for budget in result.data]
+        except Exception as e:
+            st.error(f"Error fetching property budgets: {str(e)}")
+            return []
+    
+    def get_budget_by_id(self, budget_id: int) -> Optional[Budget]:
+        """Get a specific budget by ID"""
+        try:
+            result = self.client.table("budgets").select("*").eq("id", budget_id).execute()
+            if result.data:
+                return Budget(**result.data[0])
+            return None
+        except Exception as e:
+            st.error(f"Error fetching budget: {str(e)}")
+            return None
+    
+    def update_budget(self, budget_id: int, budget: Budget) -> bool:
+        """Update a budget"""
+        try:
+            budget_dict = budget.dict(exclude={'id', 'created_at', 'updated_at'})
+            budget_dict['start_date'] = budget_dict['start_date'].isoformat()
+            budget_dict['end_date'] = budget_dict['end_date'].isoformat()
+            
+            result = self.client.table("budgets").update(budget_dict).eq("id", budget_id).execute()
+            return len(result.data) > 0
+        except Exception as e:
+            st.error(f"Error updating budget: {str(e)}")
+            return False
+    
+    def delete_budget(self, budget_id: int) -> bool:
+        """Delete a budget"""
+        try:
+            result = self.client.table("budgets").delete().eq("id", budget_id).execute()
+            return len(result.data) > 0
+        except Exception as e:
+            st.error(f"Error deleting budget: {str(e)}")
+            return False
+    
+    def create_budget_line(self, budget_line: BudgetLine) -> Optional[BudgetLine]:
+        """Create a new budget line"""
+        try:
+            budget_line_dict = budget_line.dict(exclude={'id', 'created_at', 'updated_at'})
+            
+            result = self.client.table("budget_lines").insert(budget_line_dict).execute()
+            if result.data:
+                return BudgetLine(**result.data[0])
+            return None
+        except Exception as e:
+            st.error(f"Error creating budget line: {str(e)}")
+            return None
+    
+    def get_budget_lines(self, budget_id: int) -> List[BudgetLine]:
+        """Get all budget lines for a budget"""
+        try:
+            result = self.client.table("budget_lines").select("*, categories(*)").eq("budget_id", budget_id).execute()
+            budget_lines = []
+            for row in result.data:
+                budget_line_data = {k: v for k, v in row.items() if k != 'categories'}
+                budget_lines.append(BudgetLine(**budget_line_data))
+            return budget_lines
+        except Exception as e:
+            # If budget_lines table doesn't exist or has issues, return empty list
+            # This prevents the error from breaking the budget overview
+            return []
+    
+    def update_budget_line(self, budget_line_id: int, budget_line: BudgetLine) -> bool:
+        """Update a budget line"""
+        try:
+            budget_line_dict = budget_line.dict(exclude={'id', 'created_at', 'updated_at'})
+            
+            result = self.client.table("budget_lines").update(budget_line_dict).eq("id", budget_line_id).execute()
+            return len(result.data) > 0
+        except Exception as e:
+            st.error(f"Error updating budget line: {str(e)}")
+            return False
+    
+    def delete_budget_line(self, budget_line_id: int) -> bool:
+        """Delete a budget line"""
+        try:
+            result = self.client.table("budget_lines").delete().eq("id", budget_line_id).execute()
+            return len(result.data) > 0
+        except Exception as e:
+            st.error(f"Error deleting budget line: {str(e)}")
+            return False
+    
+    def get_budget_analysis(self, budget_id: int, start_date: datetime = None, end_date: datetime = None) -> dict:
+        """Get budget analysis with actual vs budgeted amounts"""
+        try:
+            budget = self.get_budget_by_id(budget_id)
+            if not budget:
+                return {}
+            
+            budget_lines = self.get_budget_lines(budget_id)
+            
+            # Get actual expenses for the budget period
+            if budget.scope == BudgetScope.PROPERTY and budget.property_id:
+                expenses_query = self.client.table("expenses").select("amount, expense_type").eq("property_id", budget.property_id)
+            else:
+                expenses_query = self.client.table("expenses").select("amount, expense_type").eq("organization_id", budget.organization_id)
+            
+            if start_date:
+                expenses_query = expenses_query.gte("transaction_date", start_date.isoformat())
+            if end_date:
+                expenses_query = expenses_query.lte("transaction_date", end_date.isoformat())
+            
+            expenses_result = expenses_query.execute()
+            
+            # Calculate actual amounts by category
+            actual_by_category = {}
+            for expense in expenses_result.data:
+                category = expense['expense_type']
+                if category not in actual_by_category:
+                    actual_by_category[category] = 0
+                actual_by_category[category] += expense['amount']
+            
+            # Calculate budget vs actual
+            # If no budget lines exist, use the main budget amount
+            if budget_lines:
+                total_budgeted = sum(line.budgeted_amount for line in budget_lines)
+            else:
+                total_budgeted = budget.budget_amount  # Use the main budget amount
+            
+            total_actual = sum(actual_by_category.values())
+            
+            analysis = {
+                'budget': budget,
+                'budget_lines': budget_lines,
+                'total_budgeted': total_budgeted,
+                'total_actual': total_actual,
+                'variance': total_actual - total_budgeted,
+                'variance_percentage': ((total_actual - total_budgeted) / total_budgeted * 100) if total_budgeted > 0 else 0,
+                'actual_by_category': actual_by_category,
+                'is_over_budget': total_actual > total_budgeted
+            }
+            
+            return analysis
+        except Exception as e:
+            st.error(f"Error calculating budget analysis: {str(e)}")
+            return {}

@@ -33,6 +33,15 @@ class OrganizationRole(str, Enum):
     ADMIN = "admin"
     MEMBER = "member"
 
+class BudgetPeriod(str, Enum):
+    MONTHLY = "monthly"
+    YEARLY = "yearly"
+    CUSTOM = "custom"
+
+class BudgetScope(str, Enum):
+    PROPERTY = "property"
+    ORGANIZATION = "organization"
+
 class Organization(BaseModel):
     id: Optional[int] = None
     name: str
@@ -103,5 +112,30 @@ class RentReminder(BaseModel):
     is_rent_recorded: bool = False
     reminder_count: int = 0
     max_reminders: int = 6
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class Budget(BaseModel):
+    id: Optional[int] = None
+    organization_id: int
+    property_id: Optional[int] = None  # None for organization-wide budgets
+    user_id: str
+    name: str
+    description: Optional[str] = None
+    budget_amount: float
+    period: BudgetPeriod
+    scope: BudgetScope
+    start_date: datetime
+    end_date: datetime
+    is_active: bool = True
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class BudgetLine(BaseModel):
+    id: Optional[int] = None
+    budget_id: int
+    category_id: int
+    budgeted_amount: float
+    actual_amount: Optional[float] = 0.0
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
