@@ -26,29 +26,546 @@ st.set_page_config(
 # Custom CSS
 st.markdown("""
 <style>
-    /* Compact sidebar styling */
-    .css-1d391kg {
-        padding-top: 1rem;
-    }
-    .css-1cypcdb {
-        padding-top: 0.5rem;
-    }
-    .css-1d391kg .stMarkdown {
-        margin-bottom: 0.5rem;
-    }
-    .css-1d391kg .stSelectbox {
-        margin-bottom: 0.5rem;
-    }
-    .css-1d391kg .stButton {
-        margin-top: 0.5rem;
+    /* Global font and spacing improvements */
+    .stApp {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     
+    /* Compact sidebar styling */
+    .css-1d391kg {
+        padding-top: 0.8rem;
+        min-width: 250px !important;
+        width: 250px !important;
+    }
+    .css-1cypcdb {
+        padding-top: 0.3rem;
+    }
+    .css-1d391kg .stMarkdown {
+        margin-bottom: 0.3rem;
+    }
+    .css-1d391kg .stSelectbox {
+        margin-bottom: 0.3rem;
+        width: 100% !important;
+    }
+    .css-1d391kg .stButton {
+        margin-top: 0.3rem;
+    }
+    
+    /* Ensure sidebar has enough width for organization names */
+    .css-1d391kg {
+        min-width: 300px !important;
+        width: 300px !important;
+        max-width: 300px !important;
+    }
+    
+    /* Force sidebar width */
+    .stSidebar {
+        min-width: 300px !important;
+        width: 300px !important;
+    }
+    
+    /* Override Streamlit's default sidebar width */
+    .css-1d391kg {
+        min-width: 300px !important;
+        width: 300px !important;
+        max-width: 300px !important;
+    }
+    
+    /* Improved main headers */
     .main-header {
-        font-size: 2.5rem;
-        font-weight: bold;
+        font-size: 1.5rem;
+        font-weight: 600;
         color: #1f77b4;
         text-align: center;
+        margin-bottom: 0.6rem;
+        letter-spacing: -0.3px;
+    }
+    
+    /* Specific header sizing for different levels */
+    h1.main-header {
+        font-size: 1.8rem !important;
+        margin-bottom: 0.8rem !important;
+    }
+    
+    h2.main-header {
+        font-size: 1.3rem !important;
+        margin-bottom: 0.6rem !important;
+    }
+    
+    h3.main-header {
+        font-size: 1.1rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+    
+    /* Section headers */
+    h1 {
+        font-size: 1.8rem !important;
+        font-weight: 600 !important;
+        margin-bottom: 0.6rem !important;
+    }
+    
+    h2 {
+        font-size: 1.3rem !important;
+        font-weight: 600 !important;
+        margin-bottom: 0.5rem !important;
+    }
+    
+    h3 {
+        font-size: 1.1rem !important;
+        font-weight: 600 !important;
+        margin-bottom: 0.4rem !important;
+    }
+    
+    /* Streamlit specific header overrides */
+    .stMarkdown h1 {
+        font-size: 1.8rem !important;
+        font-weight: 600 !important;
+        margin-bottom: 0.6rem !important;
+    }
+    
+    .stMarkdown h2 {
+        font-size: 1.3rem !important;
+        font-weight: 600 !important;
+        margin-bottom: 0.5rem !important;
+    }
+    
+    .stMarkdown h3 {
+        font-size: 1.1rem !important;
+        font-weight: 600 !important;
+        margin-bottom: 0.4rem !important;
+    }
+    
+    /* Additional header styling for better proportions */
+    .stMarkdown h4 {
+        font-size: 1rem !important;
+        font-weight: 600 !important;
+        margin-bottom: 0.3rem !important;
+    }
+    
+    .stMarkdown h5 {
+        font-size: 0.9rem !important;
+        font-weight: 600 !important;
+        margin-bottom: 0.2rem !important;
+    }
+    
+    /* Subheader styling */
+    .stMarkdown h2:not(.main-header) {
+        font-size: 1.2rem !important;
+        font-weight: 600 !important;
+        margin-bottom: 0.5rem !important;
+        color: #2c3e50 !important;
+    }
+    
+    /* Better spacing for content sections */
+    .stMarkdown p {
+        margin-bottom: 0.5rem !important;
+        font-size: 0.9rem !important;
+    }
+    
+    /* Info banner styling */
+    .stInfo {
+        font-size: 0.85rem !important;
+        padding: 0.6rem !important;
+    }
+    
+    /* Better table styling */
+    .stDataFrame {
+        font-size: 0.85rem;
+    }
+    
+    .stDataFrame table {
+        border-collapse: collapse;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .stDataFrame th {
+        background-color: #f8f9fa;
+        font-weight: 600;
+        font-size: 0.8rem;
+        padding: 0.6rem 0.8rem;
+        border-bottom: 2px solid #dee2e6;
+    }
+    
+    .stDataFrame td {
+        padding: 0.5rem 0.8rem;
+        border-bottom: 1px solid #f1f3f4;
+        font-size: 0.8rem;
+    }
+    
+    .stDataFrame tr:hover {
+        background-color: #f8f9fa;
+    }
+    
+    /* Improved selectbox styling */
+    .stSelectbox > div > div {
+        font-size: 0.85rem;
+        padding: 0.4rem 0.6rem;
+    }
+    
+    /* Better metric cards */
+    .metric-card {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        padding: 1rem;
+        border-radius: 12px;
+        border-left: 4px solid #1f77b4;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        margin: 0.5rem 0;
+    }
+    
+    /* Improved info boxes */
+    .info-box {
+        background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+        border: 1px solid #bee5eb;
+        border-radius: 8px;
+        padding: 0.8rem;
+        margin: 0.5rem 0;
+        font-size: 0.9rem;
+    }
+    
+    /* Better tabs styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.5rem;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        font-size: 0.85rem;
+        font-weight: 500;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+    }
+    
+    /* Improved buttons */
+    .stButton > button {
+        font-size: 0.85rem;
+        font-weight: 500;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    
+    /* Better form styling */
+    .stForm {
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1rem;
+        background-color: #fafbfc;
+    }
+    
+    /* Improved text inputs */
+    .stTextInput > div > div > input,
+    .stTextArea > div > div > textarea,
+    .stNumberInput > div > div > input {
+        font-size: 0.85rem;
+        padding: 0.5rem 0.6rem;
+        border-radius: 6px;
+    }
+    
+    /* Better date inputs */
+    .stDateInput > div > div > input {
+        font-size: 0.85rem;
+        padding: 0.5rem 0.6rem;
+    }
+    
+    /* Smooth transitions */
+    * {
+        transition: all 0.2s ease;
+    }
+    
+    /* Better spacing for columns */
+    .stColumns {
+        gap: 1rem;
+    }
+    
+    /* Improved sidebar navigation */
+    .css-1d391kg .stMarkdown h3 {
+        font-size: 1.1rem;
         margin-bottom: 0.5rem;
+    }
+    
+    /* Better option menu styling */
+    .css-1d391kg .stSelectbox label {
+        font-size: 0.8rem;
+        font-weight: 500;
+        margin-bottom: 0.2rem;
+    }
+    
+    /* Organization dropdown styling */
+    .css-1d391kg .stSelectbox {
+        margin-bottom: 0.8rem;
+    }
+    
+    .css-1d391kg .stSelectbox > div > div {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        min-height: 2.5rem;
+        display: flex;
+        align-items: center;
+        padding: 0.5rem 0.75rem;
+    }
+    
+    .css-1d391kg .stSelectbox > div > div:hover {
+        border-color: #1f77b4;
+        box-shadow: 0 2px 4px rgba(31, 119, 180, 0.1);
+    }
+    
+    /* Fix all dropdowns to show data properly with smaller font */
+    .stSelectbox > div > div > div:first-child {
+        color: #1a1a1a !important;
+        font-weight: 600 !important;
+        font-size: 0.75rem !important;
+        white-space: nowrap !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+        max-width: none !important;
+        width: auto !important;
+        display: block !important;
+        line-height: 1.3 !important;
+    }
+    
+    /* Ensure all selectbox text is visible */
+    .stSelectbox > div > div {
+        min-width: 150px !important;
+        width: 100% !important;
+        font-size: 0.75rem !important;
+    }
+    
+    .stSelectbox > div > div > div:first-child {
+        min-width: 120px !important;
+        width: auto !important;
+        max-width: none !important;
+        font-size: 0.75rem !important;
+    }
+    
+    /* Fix dropdown options font size */
+    .stSelectbox > div > div > div {
+        font-size: 0.75rem !important;
+        color: #1a1a1a !important;
+    }
+    
+    /* Ensure dropdown container has proper sizing */
+    .stSelectbox > div > div {
+        padding: 0.3rem 0.5rem !important;
+        min-height: 2rem !important;
+    }
+    
+    /* Fix dropdown options menu */
+    .stSelectbox > div > div[role="combobox"] {
+        font-size: 0.8rem !important;
+    }
+    
+    /* Target the actual dropdown options */
+    .stSelectbox > div > div > div[role="option"] {
+        font-size: 0.8rem !important;
+        color: #2c3e50 !important;
+        padding: 0.3rem 0.5rem !important;
+    }
+    
+    /* Fix for Streamlit's dropdown menu */
+    div[data-baseweb="select"] > div > div {
+        font-size: 0.8rem !important;
+    }
+    
+    div[data-baseweb="select"] > div > div > div {
+        font-size: 0.8rem !important;
+        color: #2c3e50 !important;
+    }
+    
+    /* Additional fix for dropdown text visibility */
+    .stSelectbox label + div > div {
+        font-size: 0.8rem !important;
+        color: #2c3e50 !important;
+    }
+    
+    /* Comprehensive dropdown fix */
+    .stSelectbox * {
+        font-size: 0.75rem !important;
+    }
+    
+    .stSelectbox input {
+        font-size: 0.75rem !important;
+        color: #1a1a1a !important;
+    }
+    
+    /* Fix for all select elements */
+    select, option {
+        font-size: 0.75rem !important;
+        color: #1a1a1a !important;
+    }
+    
+    /* Target Streamlit's specific dropdown classes */
+    .css-1d391kg .stSelectbox > div > div > div:first-child {
+        font-size: 0.75rem !important;
+        color: #1a1a1a !important;
+        font-weight: 600 !important;
+    }
+    
+    /* Additional visibility fixes */
+    .stSelectbox > div > div > div:first-child {
+        opacity: 1 !important;
+        visibility: visible !important;
+        display: block !important;
+    }
+    
+    /* Force text to be visible */
+    .stSelectbox > div > div {
+        background-color: #ffffff !important;
+        border: 1px solid #d1d5db !important;
+    }
+    
+    /* Dropdown arrow styling */
+    .css-1d391kg .stSelectbox > div > div > div:last-child {
+        color: #6c757d !important;
+    }
+    
+    /* Organization dropdown specific styling - larger size */
+    [data-testid="stSelectbox"]:has([aria-label*="Organization"]) {
+        margin-bottom: 1rem;
+    }
+    
+    [data-testid="stSelectbox"]:has([aria-label*="Organization"]) > div > div {
+        background-color: #ffffff;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        color: #1f77b4;
+        min-height: 3.2rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        padding: 0.8rem 1rem;
+    }
+    
+    [data-testid="stSelectbox"]:has([aria-label*="Organization"]) > div > div:hover {
+        border-color: #1f77b4;
+        box-shadow: 0 2px 6px rgba(31, 119, 180, 0.15);
+    }
+    
+    /* Simple fix for organization dropdown text display */
+    .stSelectbox > div > div > div:first-child {
+        font-size: 1rem !important;
+        font-weight: 600 !important;
+        color: #2c3e50 !important;
+        white-space: nowrap !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+        max-width: none !important;
+        width: auto !important;
+    }
+    
+    /* Additional organization dropdown fixes */
+    .stSelectbox[data-testid="stSelectbox"] label {
+        font-size: 0.8rem !important;
+        font-weight: 600 !important;
+        color: #1f77b4 !important;
+        margin-bottom: 0.3rem !important;
+    }
+    
+    /* Ensure the selected value is visible */
+    .stSelectbox > div > div > div:first-child {
+        color: #2c3e50 !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+    }
+    
+    /* Fix for organization dropdown specifically */
+    div[data-testid="stSelectbox"]:has(label:contains("Organization")) {
+        margin-bottom: 1rem;
+        width: 100% !important;
+    }
+    
+    div[data-testid="stSelectbox"]:has(label:contains("Organization")) > div {
+        width: 100% !important;
+    }
+    
+    div[data-testid="stSelectbox"]:has(label:contains("Organization")) > div > div {
+        background-color: #ffffff !important;
+        border: 2px solid #e9ecef !important;
+        border-radius: 8px !important;
+        font-size: 0.85rem !important;
+        font-weight: 600 !important;
+        color: #1f77b4 !important;
+        min-height: 2.6rem !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+        padding: 0.5rem 0.7rem !important;
+        width: 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+    }
+    
+    div[data-testid="stSelectbox"]:has(label:contains("Organization")) > div > div > div {
+        color: #2c3e50 !important;
+        font-weight: 600 !important;
+        font-size: 0.85rem !important;
+        white-space: nowrap !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+        flex: 1 !important;
+        min-width: 0 !important;
+        width: auto !important;
+        max-width: none !important;
+        display: inline-block !important;
+    }
+    
+    /* More aggressive fix for organization dropdown */
+    .stSelectbox label:contains("Organization") + div > div {
+        width: 100% !important;
+        min-width: 250px !important;
+        max-width: none !important;
+    }
+    
+    .stSelectbox label:contains("Organization") + div > div > div {
+        width: auto !important;
+        min-width: 200px !important;
+        max-width: none !important;
+        white-space: nowrap !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+    }
+    
+    /* Force organization dropdown to show full text */
+    [data-testid="stSelectbox"] label[for*="sidebar_organization_selector"] + div {
+        width: 100% !important;
+        min-width: 250px !important;
+    }
+    
+    [data-testid="stSelectbox"] label[for*="sidebar_organization_selector"] + div > div {
+        width: 100% !important;
+        min-width: 250px !important;
+        max-width: none !important;
+    }
+    
+    [data-testid="stSelectbox"] label[for*="sidebar_organization_selector"] + div > div > div {
+        width: auto !important;
+        min-width: 200px !important;
+        max-width: none !important;
+        white-space: nowrap !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+    }
+    
+    /* Ensure the dropdown container has enough width */
+    .css-1d391kg .stSelectbox {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    
+    .css-1d391kg .stSelectbox > div {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    
+    .css-1d391kg .stSelectbox > div > div {
+        width: 100% !important;
+        max-width: 100% !important;
     }
     .auth-container {
         max-width: 400px;
@@ -287,19 +804,21 @@ def show_main_app():
         # Compact header
         st.markdown("### 🏠 PropLedger")
         
+        
         # Navigation - Most important section (moved to top)
         selected = option_menu(
-            menu_title="📋 Navigation",
+            menu_title=None,  # Remove the "Navigation" title
             options=["Organizations Dashboard", "Dashboard", "Properties", "Accounting", "Budget Planner", "Analytics", "Rent Reminders", "Reports", "AI Insights"],
             icons=["building", "speedometer2", "house", "calculator", "calculator", "graph-up", "bell", "file-earmark-text", "robot"],
             menu_icon="cast",
             default_index=1,
             key="main_navigation",
             styles={
-                "container": {"padding": "0!important", "background-color": "#fafafa", "margin": "0"},
-                "icon": {"color": "orange", "font-size": "20px"}, 
-                "nav-link": {"font-size": "14px", "text-align": "left", "margin": "0", "padding": "8px 12px"},
-                "nav-link-selected": {"background-color": "#02ab21"},
+                "container": {"padding": "0!important", "background-color": "#fafafa", "margin": "0", "border-radius": "8px"},
+                "icon": {"color": "#1f77b4", "font-size": "18px"}, 
+                "nav-link": {"font-size": "13px", "text-align": "left", "margin": "2px 0", "padding": "6px 10px", "border-radius": "6px", "font-weight": "500"},
+                "nav-link-selected": {"background-color": "#02ab21", "color": "white"},
+                "nav-link:hover": {"background-color": "#e9ecef", "color": "#1f77b4"},
             }
         )
         
@@ -321,12 +840,76 @@ def show_main_app():
             # Compact user display
             st.markdown(f"**👤 {user_name}**")
             
-            # Organization selection - Compact
+            # Get user organizations for display
+            if user_id:
+                db = DatabaseOperations()
+                organizations = db.get_user_organizations(user_id)
+                if organizations:
+                    # Set default organization if not set
+                    if 'selected_organization' not in st.session_state:
+                        # Use default organization if set, otherwise first organization
+                        if 'default_organization' in st.session_state:
+                            st.session_state.selected_organization = st.session_state.default_organization
+                        else:
+                            st.session_state.selected_organization = organizations[0].id
+                    
+                    # Display current organization name
+                    current_org = next((org for org in organizations if org.id == st.session_state.selected_organization), organizations[0])
+                    st.markdown(f"**🏢 {current_org.name}**")
+                else:
+                    st.warning("No organizations found")
+                    if 'selected_organization' in st.session_state:
+                        del st.session_state.selected_organization
+            
+            # Check if it's demo mode (only show demo mode, hide authenticated)
+            if hasattr(st.session_state.user, 'email'):
+                is_demo = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
+            else:
+                is_demo = st.session_state.user.get('email', '') == 'demo@example.com'
+            
+            if is_demo:
+                st.markdown('🎯 **DEMO MODE**')
+        
+        # Compact logout button
+        if st.button("🚪 Logout", use_container_width=True):
+            st.session_state.authenticated = False
+            st.session_state.user = None
+            st.rerun()
+
+    # Main content based on selected page
+    if selected == "Organizations Dashboard":
+        # Show current organization name above the dashboard
+        if st.session_state.user:
+            # Handle both dict and User object types
+            if hasattr(st.session_state.user, 'email'):
+                user_id = getattr(st.session_state.user, 'id', None)
+            else:
+                user_id = st.session_state.user.get('id', None)
+            
+            if user_id:
+                db = DatabaseOperations()
+                organizations = db.get_user_organizations(user_id)
+                if organizations and 'selected_organization' in st.session_state:
+                    current_org = next((org for org in organizations if org.id == st.session_state.selected_organization), organizations[0])
+                    st.markdown(f"### 🏢 Current Organization: **{current_org.name}**")
+        
+        st.markdown('<h1 class="main-header">🏢 Organizations Dashboard</h1>', unsafe_allow_html=True)
+        
+        # Organization selector for Organizations Dashboard
+        if st.session_state.user:
+            # Handle both dict and User object types
+            if hasattr(st.session_state.user, 'email'):
+                user_id = getattr(st.session_state.user, 'id', None)
+            else:
+                user_id = st.session_state.user.get('id', None)
+            
             if user_id:
                 db = DatabaseOperations()
                 organizations = db.get_user_organizations(user_id)
                 if organizations:
                     org_names = [org.name for org in organizations]
+                    
+                    # Set default organization if not set
                     if 'selected_organization' not in st.session_state:
                         st.session_state.selected_organization = organizations[0].id
                     
@@ -340,11 +923,27 @@ def show_main_app():
                             # If selected organization not found, default to first one
                             selected_index = 0
                     
-                    selected_org_name = st.selectbox(
-                        "🏢 Organization",
-                        options=org_names,
-                        index=selected_index
-                    )
+                    # Organization selector
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        selected_org_name = st.selectbox(
+                            "Select Organization",
+                            options=org_names,
+                            index=selected_index,
+                            key="org_dashboard_organization_selector",
+                            help="Choose your default organization"
+                        )
+                    
+                    with col2:
+                        if st.button("Set as Default", help="Set this organization as default"):
+                            # Update selected organization
+                            for org in organizations:
+                                if org.name == selected_org_name:
+                                    st.session_state.selected_organization = org.id
+                                    st.session_state.default_organization = org.id  # Store as default
+                                    st.success(f"Default organization set to: {org.name}")
+                                    st.rerun()
+                                    break
                     
                     # Update selected organization
                     for org in organizations:
@@ -353,31 +952,38 @@ def show_main_app():
                             break
                 else:
                     st.warning("No organizations found")
-                    # Clear selected organization if user has no organizations
                     if 'selected_organization' in st.session_state:
                         del st.session_state.selected_organization
-            
-            # Authentication status - Compact
-            # Check if it's demo mode
-            if hasattr(st.session_state.user, 'email'):
-                is_demo = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
-            else:
-                is_demo = st.session_state.user.get('email', '') == 'demo@example.com'
-            
-            if is_demo:
-                st.markdown('🎯 **DEMO MODE**')
-            else:
-                st.markdown('✅ **AUTHENTICATED**')
         
-        # Compact logout button
-        if st.button("🚪 Logout", use_container_width=True):
-            st.session_state.authenticated = False
-            st.session_state.user = None
-            st.rerun()
-
-    # Main content based on selected page
-    if selected == "Organizations Dashboard":
-        st.markdown('<h1 class="main-header">🏢 Organizations Dashboard</h1>', unsafe_allow_html=True)
+        # Date filter for Organizations Dashboard
+        col1, col2, col3 = st.columns([2, 2, 2])
+        
+        with col1:
+            date_filter_type = st.selectbox(
+                "Date Filter",
+                ["Current Year", "All Time", "Custom Range", "Last 3 Years", "Last 5 Years"],
+                key="org_dashboard_date_filter_type"
+            )
+        
+        with col2:
+            if date_filter_type == "Custom Range":
+                start_date = st.date_input(
+                    "Start Date",
+                    value=datetime.now().date().replace(month=1, day=1),
+                    key="org_dashboard_start_date"
+                )
+            else:
+                start_date = None
+        
+        with col3:
+            if date_filter_type == "Custom Range":
+                end_date = st.date_input(
+                    "End Date",
+                    value=datetime.now().date(),
+                    key="org_dashboard_end_date"
+                )
+            else:
+                end_date = None
         
         # Check if demo mode
         is_demo_mode = False
@@ -670,6 +1276,36 @@ def show_main_app():
     elif selected == "Dashboard":
         st.markdown('<h1 class="main-header">🏠 PropLedger Dashboard</h1>', unsafe_allow_html=True)
         
+        # Date filter for Dashboard
+        col1, col2, col3 = st.columns([2, 2, 2])
+        
+        with col1:
+            date_filter_type = st.selectbox(
+                "Date Filter",
+                ["Current Year", "All Time", "Custom Range", "Last 3 Years", "Last 5 Years"],
+                key="dashboard_date_filter_type"
+            )
+        
+        with col2:
+            if date_filter_type == "Custom Range":
+                start_date = st.date_input(
+                    "Start Date",
+                    value=datetime.now().date().replace(month=1, day=1),
+                    key="dashboard_start_date"
+                )
+            else:
+                start_date = None
+        
+        with col3:
+            if date_filter_type == "Custom Range":
+                end_date = st.date_input(
+                    "End Date",
+                    value=datetime.now().date(),
+                    key="dashboard_end_date"
+                )
+            else:
+                end_date = None
+        
         # Get data based on authentication mode
         is_demo_mode = False
         if st.session_state.user:
@@ -851,34 +1487,6 @@ def show_main_app():
                     st.info("No income or expense records found")
                 
                 st.markdown("---")
-                
-                # Compact Properties Overview
-                st.markdown("### 🏠 Properties Performance")
-                
-                # Create property cards in horizontal layout
-                if org_properties:
-                    prop_cols = st.columns(min(len(org_properties), 3))  # Max 3 properties per row
-                    
-                    for i, prop in enumerate(org_properties):
-                        with prop_cols[i % 3]:
-                            # Get property-specific income and expenses
-                            prop_income = [inc for inc in org_income if inc.property_id == prop.id]
-                            prop_expenses = [exp for exp in org_expenses if exp.property_id == prop.id]
-                            
-                            prop_total_income = sum(inc.amount for inc in prop_income)
-                            prop_total_expenses = sum(exp.amount for exp in prop_expenses)
-                            prop_net_income = prop_total_income - prop_total_expenses
-                            prop_roi = (prop_net_income / prop.purchase_price * 100) if prop.purchase_price > 0 else 0
-                            
-                            with st.container():
-                                st.markdown(f"**{prop.name}**")
-                                st.markdown(f"*{prop.address}*")
-                                st.metric("Monthly Rent", f"${prop.monthly_rent:,.0f}")
-                                st.metric("Net Income", f"${prop_net_income:,.0f}")
-                                st.metric("ROI", f"{prop_roi:.1f}%")
-                                st.markdown("---")
-                else:
-                    st.info("No properties found for this organization")
                 
                 # Compact Recent Transactions
                 st.markdown("### 📋 Recent Activity")
@@ -2673,8 +3281,8 @@ def show_main_app():
         # Sub-menu for Reports
         sub_selected = option_menu(
             None,
-            ["P&L", "Transactions"],
-            icons=["graph-up", "list-task"],
+            ["P&L", "Transactions", "Properties Performance"],
+            icons=["graph-up", "list-task", "house"],
             menu_icon="cast",
             default_index=0,
             key="reports_submenu",
@@ -3223,6 +3831,215 @@ def show_main_app():
                         st.error(f"Error generating Transactions report: {str(e)}")
             else:
                 st.warning("Please select an organization first to view transactions.")
+        
+        elif sub_selected == "Properties Performance":
+            # -------------------- Properties Performance Report --------------------
+            st.markdown("## 🏠 Properties Performance Report")
+            
+            if 'selected_organization' in st.session_state and st.session_state.selected_organization:
+                selected_org_id = st.session_state.selected_organization
+                org_name_perf = st.session_state.get('selected_org_name')
+                if not org_name_perf:
+                    try:
+                        org_obj = db.get_organization_by_id(selected_org_id)
+                        org_name_perf = org_obj.name if org_obj else 'Unknown Organization'
+                    except Exception:
+                        org_name_perf = 'Unknown Organization'
+
+                # Get properties for this organization
+                try:
+                    org_properties = db.get_properties_by_organization(selected_org_id)
+                    property_names = {prop.id: prop.name for prop in org_properties}
+                except Exception as e:
+                    st.error(f"Error fetching properties: {str(e)}")
+                    org_properties = []
+                    property_names = {}
+
+                # Filters row
+                col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+                
+                with col1:
+                    # Property filter
+                    selected_property_id = st.selectbox(
+                        "Filter by Property", 
+                        ["All"] + list(property_names.keys()), 
+                        format_func=lambda x: "All" if x == "All" else property_names[x],
+                        key="properties_performance_property_filter"
+                    )
+                
+                with col2:
+                    # Date filter type
+                    date_filter_type = st.selectbox(
+                        "Date Filter", 
+                        ["Current Year", "All Time", "Custom Range", "Last 3 Years", "Last 5 Years"],
+                        key="properties_performance_date_filter_type"
+                    )
+                
+                with col3:
+                    if date_filter_type == "Custom Range":
+                        start_date = st.date_input("Start Date", value=date.today().replace(month=1, day=1), key="properties_performance_start_date")
+                    else:
+                        start_date = None
+                
+                with col4:
+                    if date_filter_type == "Custom Range":
+                        end_date = st.date_input("End Date", value=date.today(), key="properties_performance_end_date")
+                    else:
+                        end_date = None
+
+                # Calculate date range
+                if date_filter_type == "Current Year":
+                    start_date = date.today().replace(month=1, day=1)
+                    end_date = date.today()
+                elif date_filter_type == "All Time":
+                    start_date = None
+                    end_date = None
+                elif date_filter_type == "Last 3 Years":
+                    start_date = date.today().replace(year=date.today().year - 3)
+                    end_date = date.today()
+                elif date_filter_type == "Last 5 Years":
+                    start_date = date.today().replace(year=date.today().year - 5)
+                    end_date = date.today()
+
+                # Filter properties based on selection
+                if selected_property_id != "All":
+                    filtered_properties = [prop for prop in org_properties if prop.id == selected_property_id]
+                else:
+                    filtered_properties = org_properties
+
+                if filtered_properties:
+                    st.markdown(f"**Report for: {org_name_perf}**")
+                    if selected_property_id != "All":
+                        st.markdown(f"**Property: {property_names[selected_property_id]}**")
+                    
+                    # Get all income and expenses once for efficiency
+                    try:
+                        all_income = db.get_all_income()
+                        all_expenses = db.get_all_expenses()
+                    except Exception as e:
+                        st.error(f"Error fetching financial data: {str(e)}")
+                        all_income = []
+                        all_expenses = []
+                    
+                    # Create property performance cards
+                    prop_cols = st.columns(min(len(filtered_properties), 3))  # Max 3 properties per row
+                    
+                    for i, prop in enumerate(filtered_properties):
+                        with prop_cols[i % 3]:
+                            try:
+                                
+                                # Filter by organization and property
+                                prop_income = [inc for inc in all_income if inc.organization_id == selected_org_id and inc.property_id == prop.id]
+                                prop_expenses = [exp for exp in all_expenses if exp.organization_id == selected_org_id and exp.property_id == prop.id]
+                                
+                                # Apply date filters if specified
+                                if start_date:
+                                    # Convert date to datetime for comparison
+                                    start_datetime = datetime.combine(start_date, datetime.min.time())
+                                    prop_income = [inc for inc in prop_income if inc.transaction_date >= start_datetime]
+                                    prop_expenses = [exp for exp in prop_expenses if exp.transaction_date >= start_datetime]
+                                if end_date:
+                                    # Convert date to datetime for comparison
+                                    end_datetime = datetime.combine(end_date, datetime.max.time())
+                                    prop_income = [inc for inc in prop_income if inc.transaction_date <= end_datetime]
+                                    prop_expenses = [exp for exp in prop_expenses if exp.transaction_date <= end_datetime]
+                                
+                                prop_total_income = sum(inc.amount for inc in prop_income)
+                                prop_total_expenses = sum(exp.amount for exp in prop_expenses)
+                                prop_net_income = prop_total_income - prop_total_expenses
+                                prop_roi = (prop_net_income / prop.purchase_price * 100) if prop.purchase_price > 0 else 0
+                                
+                                # Calculate occupancy rate (simplified)
+                                total_days = (end_date - start_date).days if start_date and end_date else 365
+                                occupancy_rate = 95.0  # Placeholder - would need actual occupancy data
+                                
+                                with st.container():
+                                    st.markdown(f"**{prop.name}**")
+                                    st.markdown(f"*{prop.address}*")
+                                    
+                                    # Key metrics
+                                    col1, col2 = st.columns(2)
+                                    with col1:
+                                        st.metric("Monthly Rent", f"${prop.monthly_rent:,.0f}")
+                                        st.metric("Total Income", f"${prop_total_income:,.0f}")
+                                    with col2:
+                                        st.metric("Total Expenses", f"${prop_total_expenses:,.0f}")
+                                        st.metric("Net Income", f"${prop_net_income:,.0f}")
+                                    
+                                    # Performance metrics
+                                    st.metric("ROI", f"{prop_roi:.1f}%")
+                                    st.metric("Occupancy Rate", f"{occupancy_rate:.1f}%")
+                                    
+                                    # Property details
+                                    with st.expander("Property Details"):
+                                        st.write(f"**Purchase Price:** ${prop.purchase_price:,.0f}")
+                                        st.write(f"**Property Type:** {prop.property_type.value.title()}")
+                                        st.write(f"**Purchase Date:** {prop.purchase_date.strftime('%B %d, %Y')}")
+                                        st.write(f"**Description:** {prop.description or 'No description available'}")
+                                    
+                                    st.markdown("---")
+                                    
+                            except Exception as e:
+                                st.error(f"Error loading data for {prop.name}: {str(e)}")
+                    
+                    # Summary statistics
+                    if len(filtered_properties) > 1:
+                        st.markdown("### 📊 Summary Statistics")
+                        
+                        # Calculate totals for all filtered properties
+                        total_income = 0
+                        total_expenses = 0
+                        roi_sum = 0
+                        
+                        for prop in filtered_properties:
+                            # Get property-specific income and expenses
+                            prop_income = [inc for inc in all_income if inc.organization_id == selected_org_id and inc.property_id == prop.id]
+                            prop_expenses = [exp for exp in all_expenses if exp.organization_id == selected_org_id and exp.property_id == prop.id]
+                            
+                            # Apply date filters if specified
+                            if start_date:
+                                # Convert date to datetime for comparison
+                                start_datetime = datetime.combine(start_date, datetime.min.time())
+                                prop_income = [inc for inc in prop_income if inc.transaction_date >= start_datetime]
+                                prop_expenses = [exp for exp in prop_expenses if exp.transaction_date >= start_datetime]
+                            if end_date:
+                                # Convert date to datetime for comparison
+                                end_datetime = datetime.combine(end_date, datetime.max.time())
+                                prop_income = [inc for inc in prop_income if inc.transaction_date <= end_datetime]
+                                prop_expenses = [exp for exp in prop_expenses if exp.transaction_date <= end_datetime]
+                            
+                            prop_total_income = sum(inc.amount for inc in prop_income)
+                            prop_total_expenses = sum(exp.amount for exp in prop_expenses)
+                            
+                            total_income += prop_total_income
+                            total_expenses += prop_total_expenses
+                            
+                            # Calculate ROI for this property
+                            prop_net_income = prop_total_income - prop_total_expenses
+                            prop_roi = (prop_net_income / prop.purchase_price * 100) if prop.purchase_price > 0 else 0
+                            roi_sum += prop_roi
+                        
+                        total_net = total_income - total_expenses
+                        avg_roi = roi_sum / len(filtered_properties)
+                        
+                        summary_cols = st.columns(4)
+                        with summary_cols[0]:
+                            st.metric("Total Properties", len(filtered_properties))
+                        with summary_cols[1]:
+                            st.metric("Total Income", f"${total_income:,.0f}")
+                        with summary_cols[2]:
+                            st.metric("Total Expenses", f"${total_expenses:,.0f}")
+                        with summary_cols[3]:
+                            st.metric("Average ROI", f"{avg_roi:.1f}%")
+                
+                else:
+                    if selected_property_id != "All":
+                        st.info(f"No properties found matching the selected criteria.")
+                    else:
+                        st.info("No properties found for this organization.")
+                        
+            else:
+                st.warning("Please select an organization first to view properties performance.")
 
     elif selected == "AI Insights":
         st.markdown('<h1 class="main-header">🤖 AI-Powered Insights</h1>', unsafe_allow_html=True)
