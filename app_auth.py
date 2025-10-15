@@ -2053,8 +2053,6 @@ def show_main_app():
                     
                     with col1:
                         name = st.text_input("Property Name *", placeholder="e.g., Downtown Apartment")
-                        # Import PropertyType locally to avoid scope issues
-                        from database.models import PropertyType
                         property_type = st.selectbox("Property Type *", [pt.value for pt in PropertyType])
                         purchase_price = st.number_input("Purchase Price *", min_value=0.0, format="%.2f")
                     
