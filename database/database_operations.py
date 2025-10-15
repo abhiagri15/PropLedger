@@ -1,5 +1,5 @@
 from database.supabase_client import get_supabase_client
-from database.models import Property, Income, Expense, Category, Organization, UserOrganization, Budget, BudgetLine, BudgetPeriod, BudgetScope
+from database.models import Property, Income, Expense, Category, Organization, UserOrganization, Budget, BudgetLine, BudgetPeriod, BudgetScope, RecurringTransaction, PendingTransaction
 from typing import List, Optional
 import streamlit as st
 from datetime import datetime
@@ -429,3 +429,140 @@ class DatabaseOperations:
         except Exception as e:
             st.error(f"Error calculating budget analysis: {str(e)}")
             return {}
+    
+    # Recurring Transaction Operations
+    def create_recurring_transaction(self, recurring_transaction: RecurringTransaction) -> Optional[RecurringTransaction]:
+        """Create a new recurring transaction"""
+        try:
+            recurring_dict = recurring_transaction.dict(exclude={'id', 'created_at', 'updated_at'})
+            recurring_dict['start_date'] = recurring_dict['start_date'].isoformat()
+            if recurring_dict.get('end_date'):
+                recurring_dict['end_date'] = recurring_dict['end_date'].isoformat()
+            
+            result = self.client.table("recurring_transactions").insert(recurring_dict).execute()
+            if result.data:
+                return RecurringTransaction(**result.data[0])
+            return None
+        except Exception as e:
+            st.error(f"Error creating recurring transaction: {str(e)}")
+            return None
+    
+    def get_recurring_transactions_by_organization(self, organization_id: int) -> List[RecurringTransaction]:
+        """Get all recurring transactions for an organization"""
+        try:
+            result = self.client.table("recurring_transactions").select("*").eq("organization_id", organization_id).eq("is_active", True).execute()
+            return [RecurringTransaction(**rt) for rt in result.data]
+        except Exception as e:
+            st.error(f"Error fetching recurring transactions: {str(e)}")
+            return []
+    
+    def update_recurring_transaction(self, recurring_id: int, recurring_transaction: RecurringTransaction) -> bool:
+        """Update a recurring transaction"""
+        try:
+            recurring_dict = recurring_transaction.dict(exclude={'id', 'created_at', 'updated_at'})
+            recurring_dict['start_date'] = recurring_dict['start_date'].isoformat()
+            if recurring_dict.get('end_date'):
+                recurring_dict['end_date'] = recurring_dict['end_date'].isoformat()
+            
+            result = self.client.table("recurring_transactions").update(recurring_dict).eq("id", recurring_id).execute()
+            return len(result.data) > 0
+        except Exception as e:
+            st.error(f"Error updating recurring transaction: {str(e)}")
+            return False
+    
+    def delete_recurring_transaction(self, recurring_id: int) -> bool:
+        """Delete a recurring transaction"""
+        try:
+            result = self.client.table("recurring_transactions").delete().eq("id", recurring_id).execute()
+            return len(result.data) > 0
+        except Exception as e:
+            st.error(f"Error deleting recurring transaction: {str(e)}")
+            return False
+    
+    # Pending Transaction Operations
+    def create_pending_transaction(self, pending_transaction: PendingTransaction) -> Optional[PendingTransaction]:
+        """Create a new pending transaction"""
+        try:
+            pending_dict = pending_transaction.dict(exclude={'id', 'created_at', 'updated_at'})
+            pending_dict['transaction_date'] = pending_dict['transaction_date'].isoformat()
+            
+            result = self.client.table("pending_transactions").insert(pending_dict).execute()
+            if result.data:
+                return PendingTransaction(**result.data[0])
+            return None
+        except Exception as e:
+            st.error(f"Error creating pending transaction: {str(e)}")
+            return None
+    
+    def get_pending_transactions_by_organization(self, organization_id: int, transaction_type: str = None) -> List[PendingTransaction]:
+        """Get all pending transactions for an organization"""
+        try:
+            query = self.client.table("pending_transactions").select("*").eq("organization_id", organization_id)
+            if transaction_type:
+                query = query.eq("transaction_type", transaction_type)
+            
+            result = query.order("transaction_date", desc=True).execute()
+            return [PendingTransaction(**pt) for pt in result.data]
+        except Exception as e:
+            st.error(f"Error fetching pending transactions: {str(e)}")
+            return []
+    
+    def update_pending_transaction(self, pending_id: int, pending_transaction: PendingTransaction) -> bool:
+        """Update a pending transaction"""
+        try:
+            pending_dict = pending_transaction.dict(exclude={'id', 'created_at', 'updated_at'})
+            pending_dict['transaction_date'] = pending_dict['transaction_date'].isoformat()
+            
+            result = self.client.table("pending_transactions").update(pending_dict).eq("id", pending_id).execute()
+            return len(result.data) > 0
+        except Exception as e:
+            st.error(f"Error updating pending transaction: {str(e)}")
+            return False
+    
+    def delete_pending_transaction(self, pending_id: int) -> bool:
+        """Delete a pending transaction"""
+        try:
+            result = self.client.table("pending_transactions").delete().eq("id", pending_id).execute()
+            return len(result.data) > 0
+        except Exception as e:
+            st.error(f"Error deleting pending transaction: {str(e)}")
+            return False
+    
+    def confirm_pending_transaction(self, pending_id: int) -> bool:
+        """Confirm a pending transaction by moving it to the appropriate table"""
+        try:
+            # Get the pending transaction
+            result = self.client.table("pending_transactions").select("*").eq("id", pending_id).execute()
+            if not result.data:
+                return False
+            
+            pending_data = result.data[0]
+            
+            # Create the appropriate transaction based on type
+            if pending_data['transaction_type'] == 'income':
+                income_data = {
+                    'organization_id': pending_data['organization_id'],
+                    'property_id': pending_data['property_id'],
+                    'amount': pending_data['amount'],
+                    'income_type': pending_data['income_type'],
+                    'description': pending_data['description'],
+                    'transaction_date': pending_data['transaction_date']
+                }
+                self.client.table("income").insert(income_data).execute()
+            else:  # expense
+                expense_data = {
+                    'organization_id': pending_data['organization_id'],
+                    'property_id': pending_data['property_id'],
+                    'amount': pending_data['amount'],
+                    'expense_type': pending_data['expense_type'],
+                    'description': pending_data['description'],
+                    'transaction_date': pending_data['transaction_date']
+                }
+                self.client.table("expenses").insert(expense_data).execute()
+            
+            # Delete the pending transaction
+            self.client.table("pending_transactions").delete().eq("id", pending_id).execute()
+            return True
+        except Exception as e:
+            st.error(f"Error confirming pending transaction: {str(e)}")
+            return False

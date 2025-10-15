@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS expenses (
     organization_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
     property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
     amount DECIMAL(10,2) NOT NULL,
-    expense_type VARCHAR(50) NOT NULL CHECK (expense_type IN ('mortgage', 'maintenance', 'repairs', 'utilities', 'insurance', 'taxes', 'management', 'advertising', 'legal', 'other')),
+    expense_type VARCHAR(50) NOT NULL CHECK (expense_type IN ('mortgage', 'maintenance', 'repairs', 'utilities', 'insurance', 'taxes', 'management', 'advertising', 'legal', 'hoa', 'home_warranty', 'other')),
     description TEXT NOT NULL,
     transaction_date DATE NOT NULL,
     receipt_url TEXT,
@@ -78,6 +78,41 @@ CREATE TABLE IF NOT EXISTS categories (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Recurring transactions table for recurring income/expense setups
+CREATE TABLE IF NOT EXISTS recurring_transactions (
+    id SERIAL PRIMARY KEY,
+    organization_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+    property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+    transaction_type VARCHAR(20) NOT NULL CHECK (transaction_type IN ('income', 'expense')),
+    income_type VARCHAR(50) CHECK (income_type IN ('rent', 'deposit', 'late_fee', 'other')),
+    expense_type VARCHAR(50) CHECK (expense_type IN ('mortgage', 'maintenance', 'repairs', 'utilities', 'insurance', 'taxes', 'management', 'advertising', 'legal', 'hoa', 'home_warranty', 'other')),
+    amount DECIMAL(10,2) NOT NULL,
+    description TEXT NOT NULL,
+    interval VARCHAR(20) NOT NULL CHECK (interval IN ('weekly', 'monthly', 'quarterly', 'yearly')),
+    start_date DATE NOT NULL,
+    end_date DATE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Pending transactions table for transactions awaiting confirmation
+CREATE TABLE IF NOT EXISTS pending_transactions (
+    id SERIAL PRIMARY KEY,
+    organization_id INTEGER REFERENCES organizations(id) ON DELETE CASCADE,
+    property_id INTEGER NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+    transaction_type VARCHAR(20) NOT NULL CHECK (transaction_type IN ('income', 'expense')),
+    income_type VARCHAR(50) CHECK (income_type IN ('rent', 'deposit', 'late_fee', 'other')),
+    expense_type VARCHAR(50) CHECK (expense_type IN ('mortgage', 'maintenance', 'repairs', 'utilities', 'insurance', 'taxes', 'management', 'advertising', 'legal', 'hoa', 'home_warranty', 'other')),
+    amount DECIMAL(10,2) NOT NULL,
+    description TEXT NOT NULL,
+    transaction_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    recurring_transaction_id INTEGER REFERENCES recurring_transactions(id) ON DELETE SET NULL,
+    is_confirmed BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_properties_user_id ON properties(user_id);
 CREATE INDEX IF NOT EXISTS idx_properties_property_type ON properties(property_type);
@@ -88,6 +123,13 @@ CREATE INDEX IF NOT EXISTS idx_expenses_user_id ON expenses(user_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_property_id ON expenses(property_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_transaction_date ON expenses(transaction_date);
 CREATE INDEX IF NOT EXISTS idx_categories_user_id ON categories(user_id);
+CREATE INDEX IF NOT EXISTS idx_recurring_transactions_organization_id ON recurring_transactions(organization_id);
+CREATE INDEX IF NOT EXISTS idx_recurring_transactions_property_id ON recurring_transactions(property_id);
+CREATE INDEX IF NOT EXISTS idx_recurring_transactions_transaction_type ON recurring_transactions(transaction_type);
+CREATE INDEX IF NOT EXISTS idx_pending_transactions_organization_id ON pending_transactions(organization_id);
+CREATE INDEX IF NOT EXISTS idx_pending_transactions_property_id ON pending_transactions(property_id);
+CREATE INDEX IF NOT EXISTS idx_pending_transactions_transaction_type ON pending_transactions(transaction_type);
+CREATE INDEX IF NOT EXISTS idx_pending_transactions_is_confirmed ON pending_transactions(is_confirmed);
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -108,6 +150,12 @@ CREATE TRIGGER update_income_updated_at BEFORE UPDATE ON income
 CREATE TRIGGER update_expenses_updated_at BEFORE UPDATE ON expenses
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_recurring_transactions_updated_at BEFORE UPDATE ON recurring_transactions
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_pending_transactions_updated_at BEFORE UPDATE ON pending_transactions
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- Enable Row Level Security (RLS)
 ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_organizations ENABLE ROW LEVEL SECURITY;
@@ -115,6 +163,8 @@ ALTER TABLE properties ENABLE ROW LEVEL SECURITY;
 ALTER TABLE income ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE recurring_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pending_transactions ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies for organizations
 CREATE POLICY "Users can view organizations they belong to" ON organizations
@@ -274,6 +324,80 @@ CREATE POLICY "Users can update own categories" ON categories
 
 CREATE POLICY "Users can delete own categories" ON categories
     FOR DELETE USING (auth.uid() = user_id);
+
+-- Create RLS policies for recurring_transactions
+CREATE POLICY "Users can view recurring transactions in their organizations" ON recurring_transactions
+    FOR SELECT USING (
+        organization_id IN (
+            SELECT organization_id 
+            FROM user_organizations 
+            WHERE user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can insert recurring transactions in their organizations" ON recurring_transactions
+    FOR INSERT WITH CHECK (
+        organization_id IN (
+            SELECT organization_id 
+            FROM user_organizations 
+            WHERE user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can update recurring transactions in their organizations" ON recurring_transactions
+    FOR UPDATE USING (
+        organization_id IN (
+            SELECT organization_id 
+            FROM user_organizations 
+            WHERE user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can delete recurring transactions in their organizations" ON recurring_transactions
+    FOR DELETE USING (
+        organization_id IN (
+            SELECT organization_id 
+            FROM user_organizations 
+            WHERE user_id = auth.uid()
+        )
+    );
+
+-- Create RLS policies for pending_transactions
+CREATE POLICY "Users can view pending transactions in their organizations" ON pending_transactions
+    FOR SELECT USING (
+        organization_id IN (
+            SELECT organization_id 
+            FROM user_organizations 
+            WHERE user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can insert pending transactions in their organizations" ON pending_transactions
+    FOR INSERT WITH CHECK (
+        organization_id IN (
+            SELECT organization_id 
+            FROM user_organizations 
+            WHERE user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can update pending transactions in their organizations" ON pending_transactions
+    FOR UPDATE USING (
+        organization_id IN (
+            SELECT organization_id 
+            FROM user_organizations 
+            WHERE user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can delete pending transactions in their organizations" ON pending_transactions
+    FOR DELETE USING (
+        organization_id IN (
+            SELECT organization_id 
+            FROM user_organizations 
+            WHERE user_id = auth.uid()
+        )
+    );
 
 -- Create views for financial reporting
 CREATE OR REPLACE VIEW property_financial_summary AS

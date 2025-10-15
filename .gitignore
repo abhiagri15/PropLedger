@@ -37,6 +37,7 @@ venv.bak/
 # IDE
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~
@@ -65,6 +66,12 @@ logs/
 # Temporary files
 *.tmp
 *.temp
+fix_*.py
+
+# Installers
+*.exe
+*.msi
+*.dmg
 
 # Test files
 test_*.py

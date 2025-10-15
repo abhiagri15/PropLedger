@@ -141,3 +141,40 @@ class BudgetLine(BaseModel):
     actual_amount: Optional[float] = 0.0
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+class RecurringInterval(str, Enum):
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+    QUARTERLY = "quarterly"
+    YEARLY = "yearly"
+
+class RecurringTransaction(BaseModel):
+    id: Optional[int] = None
+    organization_id: int
+    property_id: int
+    transaction_type: str  # 'income' or 'expense'
+    income_type: Optional[IncomeType] = None
+    expense_type: Optional[ExpenseType] = None
+    amount: float
+    description: str
+    interval: RecurringInterval
+    start_date: datetime
+    end_date: Optional[datetime] = None
+    is_active: bool = True
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class PendingTransaction(BaseModel):
+    id: Optional[int] = None
+    organization_id: int
+    property_id: int
+    transaction_type: str  # 'income' or 'expense'
+    income_type: Optional[IncomeType] = None
+    expense_type: Optional[ExpenseType] = None
+    amount: float
+    description: str
+    transaction_date: datetime
+    recurring_transaction_id: Optional[int] = None
+    is_confirmed: bool = False
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None

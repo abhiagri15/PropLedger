@@ -135,6 +135,78 @@ st.markdown("""
         margin-bottom: 0.4rem !important;
     }
     
+    /* Tighten rows and align buttons for pending items */
+    .pending-actions .stButton>button {
+        width: 100%;
+        border-radius: 10px;
+        font-weight: 600;
+        transition: all 0.15s ease-in-out;
+        padding: 0.45rem 0.6rem;
+    }
+    .pending-actions .stButton:nth-child(1) > button { /* Edit */
+        background: #fffaf0;
+        color: #B45309;
+        border: 1px solid #FBBF24;
+    }
+    .pending-actions .stButton:nth-child(1) > button:hover {
+        background: #FEF3C7;
+        border-color: #F59E0B;
+    }
+    .pending-actions .stButton:nth-child(2) > button { /* Delete */
+        background: #FEF2F2;
+        color: #B91C1C;
+        border: 1px solid #FCA5A5;
+    }
+    .pending-actions .stButton:nth-child(2) > button:hover {
+        background: #FEE2E2;
+        border-color: #EF4444;
+    }
+    .pending-actions .stButton:nth-child(3) > button { /* Confirm */
+        background: #ECFDF5;
+        color: #065F46;
+        border: 1px solid #6EE7B7;
+    }
+    .pending-actions .stButton:nth-child(3) > button:hover {
+        background: #D1FAE5;
+        border-color: #34D399;
+    }
+
+    /* Polished action buttons for pending items */
+    .pending-actions .stButton>button {
+        width: 100%;
+        border-radius: 10px;
+        font-weight: 600;
+        transition: all 0.15s ease-in-out;
+        padding: 0.5rem 0.75rem;
+    }
+    .pending-actions .stButton:nth-child(1) > button { /* Edit */
+        background: #fffaf0;
+        color: #B45309;
+        border: 1px solid #FBBF24;
+    }
+    .pending-actions .stButton:nth-child(1) > button:hover {
+        background: #FEF3C7;
+        border-color: #F59E0B;
+    }
+    .pending-actions .stButton:nth-child(2) > button { /* Delete */
+        background: #FEF2F2;
+        color: #B91C1C;
+        border: 1px solid #FCA5A5;
+    }
+    .pending-actions .stButton:nth-child(2) > button:hover {
+        background: #FEE2E2;
+        border-color: #EF4444;
+    }
+    .pending-actions .stButton:nth-child(3) > button { /* Confirm */
+        background: #ECFDF5;
+        color: #065F46;
+        border: 1px solid #6EE7B7;
+    }
+    .pending-actions .stButton:nth-child(3) > button:hover {
+        background: #D1FAE5;
+        border-color: #34D399;
+    }
+    
     /* Additional header styling for better proportions */
     .stMarkdown h4 {
         font-size: 1rem !important;
@@ -893,6 +965,39 @@ st.markdown("""
         border-left: 4px solid #1f77b4;
         margin: 1rem 0;
     }
+    
+    /* Compact status indicators spacing */
+    .stAlert {
+        margin: 0.1rem 0 !important;
+        padding: 0.4rem 0.8rem !important;
+    }
+    
+    /* Reduce spacing for all alert boxes */
+    .stInfo, .stSuccess, .stError, .stWarning {
+        margin: 0.2rem 0 !important;
+        padding: 0.5rem 1rem !important;
+    }
+    
+    /* Target specific alert types for tighter spacing */
+    .stSuccess, .stInfo, .stError, .stWarning {
+        margin-top: 0.1rem !important;
+        margin-bottom: 0.1rem !important;
+    }
+    
+    /* Reduce spacing between consecutive alerts */
+    .stAlert + .stAlert {
+        margin-top: 0.1rem !important;
+    }
+    
+    /* Dashboard column alignment */
+    .stColumns {
+        align-items: flex-start !important;
+    }
+    
+    /* Ensure consistent spacing in dashboard columns */
+    .stColumn > div {
+        padding-top: 0 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1066,7 +1171,7 @@ def show_main_app():
         # Navigation - Most important section (moved to top)
         selected = option_menu(
             menu_title=None,  # Remove the "Navigation" title
-            options=["Organizations Dashboard", "Dashboard", "Properties", "Accounting", "Budget Planner", "Analytics", "Rent Reminders", "Reports", "AI Insights"],
+            options=["Organizations Dashboard", "Dashboard", "Properties", "Accounting", "Budget Planner", "Analytics", "Reminders", "Reports", "AI Insights"],
             icons=["building", "speedometer2", "house", "calculator", "calculator", "graph-up", "bell", "file-earmark-text", "robot"],
             menu_icon="cast",
             default_index=1,
@@ -1181,68 +1286,55 @@ def show_main_app():
                             # If selected organization not found, default to first one
                             selected_index = 0
                     
-                    # Organization selector
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
+                    # Organization selector and Date Filter side by side
+                    filter_col1, filter_col2 = st.columns(2)
+
+                    with filter_col1:
                         selected_org_name = st.selectbox(
                             "Select Organization",
                             options=org_names,
                             index=selected_index,
                             key="org_dashboard_organization_selector",
-                            help="Choose your default organization"
+                            help="Selected organization will be set as default automatically"
                         )
-                    
-                    with col2:
-                        if st.button("Set as Default", help="Set this organization as default"):
-                            # Update selected organization
-                            for org in organizations:
-                                if org.name == selected_org_name:
-                                    st.session_state.selected_organization = org.id
-                                    st.session_state.default_organization = org.id  # Store as default
-                                    st.success(f"Default organization set to: {org.name}")
-                                    st.rerun()
-                                    break
-                    
-                    # Update selected organization
+
+                    with filter_col2:
+                        date_filter_type = st.selectbox(
+                            "Date Filter",
+                            ["Current Year", "All Time", "Custom Range", "Last 3 Years", "Last 5 Years"],
+                            key="org_dashboard_date_filter_type"
+                        )
+
+                    # Custom date range inputs (if Custom Range selected)
+                    if date_filter_type == "Custom Range":
+                        date_col1, date_col2 = st.columns(2)
+                        with date_col1:
+                            start_date = st.date_input(
+                                "Start Date",
+                                value=datetime.now().date().replace(month=1, day=1),
+                                key="org_dashboard_start_date"
+                            )
+                        with date_col2:
+                            end_date = st.date_input(
+                                "End Date",
+                                value=datetime.now().date(),
+                                key="org_dashboard_end_date"
+                            )
+                    else:
+                        start_date = None
+                        end_date = None
+
+                    # Automatically update selected organization and set as default
                     for org in organizations:
                         if org.name == selected_org_name:
                             st.session_state.selected_organization = org.id
+                            st.session_state.default_organization = org.id  # Automatically set as default
                             break
                 else:
                     st.warning("No organizations found")
                     if 'selected_organization' in st.session_state:
                         del st.session_state.selected_organization
-        
-        # Date filter for Organizations Dashboard
-        col1, col2, col3 = st.columns([2, 2, 2])
-        
-        with col1:
-            date_filter_type = st.selectbox(
-                "Date Filter",
-                ["Current Year", "All Time", "Custom Range", "Last 3 Years", "Last 5 Years"],
-                key="org_dashboard_date_filter_type"
-            )
-        
-        with col2:
-            if date_filter_type == "Custom Range":
-                start_date = st.date_input(
-                    "Start Date",
-                    value=datetime.now().date().replace(month=1, day=1),
-                    key="org_dashboard_start_date"
-                )
-            else:
-                start_date = None
-        
-        with col3:
-            if date_filter_type == "Custom Range":
-                end_date = st.date_input(
-                    "End Date",
-                    value=datetime.now().date(),
-                    key="org_dashboard_end_date"
-                )
-            else:
-                end_date = None
-        
+
         # Check if demo mode
         is_demo_mode = False
         if st.session_state.user:
@@ -1327,11 +1419,7 @@ def show_main_app():
                 if st.form_submit_button("Create Demo Organization", type="primary"):
                     st.success(f"Demo organization '{demo_org_name_1}' would be created!")
                     st.info("Sign up to create real organizations and manage your properties!")
-        
-        else:
-            # Real mode - show message for now
-            st.info("Real organization management - Sign up to use with your own data!")
-        
+
         if is_demo_mode:
             # Demo mode - show sample organizations
             st.markdown('<div class="info-box">🎯 <strong>Demo Mode</strong> - Showing sample organizations. Sign up to manage your own organizations!</div>', unsafe_allow_html=True)
@@ -1424,9 +1512,9 @@ def show_main_app():
                     if organizations:
                         # Display organizations
                         st.markdown("### Your Organizations")
-                        
+
                         for org in organizations:
-                            with st.expander(f"🏢 {org.name}", expanded=True):
+                            with st.expander(f"🏢 {org.name}", expanded=False):
                                 col1, col2 = st.columns(2)
                                 
                                 with col1:
@@ -1437,33 +1525,54 @@ def show_main_app():
                                     # Get organization stats
                                     properties = db.get_properties()
                                     org_properties = [p for p in properties if p.organization_id == org.id]
-                                    
-                                    st.metric("Properties", len(org_properties))
-                                
+
+                                # Display metrics in organized layout
+                                st.markdown("---")
+                                st.markdown("#### 📊 Organization Metrics")
+
+                                # Get financial data for P&L
                                 if org_properties:
                                     total_value = sum(p.purchase_price for p in org_properties)
                                     total_rent = sum(p.monthly_rent for p in org_properties)
-                                    st.metric("Total Value", f"${total_value:,.2f}")
-                                    st.metric("Monthly Rent", f"${total_rent:,.2f}")
-                                    
-                                    # Get financial data for P&L
+
                                     all_income = db.get_all_income()
                                     all_expenses = db.get_all_expenses()
-                                    
+
                                     org_income = [inc for inc in all_income if inc.organization_id == org.id]
                                     org_expenses = [exp for exp in all_expenses if exp.organization_id == org.id]
-                                    
+
                                     total_income = sum(inc.amount for inc in org_income)
                                     total_expenses = sum(exp.amount for exp in org_expenses)
                                     net_income = total_income - total_expenses
                                     profit_margin = (net_income / total_income * 100) if total_income > 0 else 0
                                     roi = (net_income / total_value * 100) if total_value > 0 else 0
-                                    
-                                    st.metric("Total Income", f"${total_income:,.2f}")
-                                    st.metric("Total Expenses", f"${total_expenses:,.2f}")
-                                    st.metric("Net Income", f"${net_income:,.2f}")
-                                    st.metric("Profit Margin", f"{profit_margin:.1f}%")
-                                    st.metric("ROI", f"{roi:.1f}%")
+
+                                    # First row - Property metrics
+                                    metric_col1, metric_col2, metric_col3 = st.columns(3)
+                                    with metric_col1:
+                                        st.metric("Properties", len(org_properties))
+                                    with metric_col2:
+                                        st.metric("Total Value", f"${total_value:,.2f}")
+                                    with metric_col3:
+                                        st.metric("Monthly Rent", f"${total_rent:,.2f}")
+
+                                    # Second row - Income/Expense metrics
+                                    metric_col4, metric_col5, metric_col6 = st.columns(3)
+                                    with metric_col4:
+                                        st.metric("Total Income", f"${total_income:,.2f}")
+                                    with metric_col5:
+                                        st.metric("Total Expenses", f"${total_expenses:,.2f}")
+                                    with metric_col6:
+                                        st.metric("Net Income", f"${net_income:,.2f}")
+
+                                    # Third row - Performance metrics
+                                    metric_col7, metric_col8, metric_col9 = st.columns(3)
+                                    with metric_col7:
+                                        st.metric("Profit Margin", f"{profit_margin:.1f}%")
+                                    with metric_col8:
+                                        st.metric("ROI", f"{roi:.1f}%")
+                                else:
+                                    st.metric("Properties", len(org_properties))
                             
                             # Add P&L Summary section
                             if org_properties and (org_income or org_expenses):
@@ -1692,13 +1801,12 @@ def show_main_app():
                 profit_margin = (net_income / total_income * 100) if total_income > 0 else 0
                 roi = (net_income / total_purchase_price * 100) if total_purchase_price > 0 else 0
                 
-                # Split screen: 60% Financial Overview + 40% Graph
-                st.markdown("### 📊 Financial Overview")
-                
-                # Create 60/40 split
-                overview_col, graph_col = st.columns([0.6, 0.4])
-                
-                with overview_col:
+                # Split screen: 60% (left) and 40% (right)
+                left_col, right_col = st.columns([0.6, 0.4])
+
+                with left_col:
+                    # Financial Summary
+                    st.markdown("#### 📊 Financial Summary")
                     # Financial metrics in 2 rows of 3 columns each
                     row1_col1, row1_col2, row1_col3 = st.columns(3)
                     with row1_col1:
@@ -1707,7 +1815,7 @@ def show_main_app():
                         st.metric("💰 Monthly Rent", f"${total_monthly_rent:,.0f}")
                     with row1_col3:
                         st.metric("📊 Total Income", f"${total_income:,.0f}")
-                    
+
                     row2_col1, row2_col2, row2_col3 = st.columns(3)
                     with row2_col1:
                         st.metric("💸 Total Expenses", f"${total_expenses:,.0f}")
@@ -1715,12 +1823,12 @@ def show_main_app():
                         st.metric("📈 Net Income", f"${net_income:,.0f}")
                     with row2_col3:
                         st.metric("📊 ROI", f"{roi:.1f}%")
-                    
+
                     st.markdown("---")
-                    
+
                     # Income & Expense Breakdown
                     st.markdown("#### 💰 Income & Expense Breakdown")
-                    
+
                     # Income breakdown
                     income_by_type = {}
                     for inc in org_income:
@@ -1728,7 +1836,7 @@ def show_main_app():
                         if income_type not in income_by_type:
                             income_by_type[income_type] = 0
                         income_by_type[income_type] += inc.amount
-                    
+
                     # Expense breakdown
                     expense_by_type = {}
                     for exp in org_expenses:
@@ -1736,54 +1844,75 @@ def show_main_app():
                         if expense_type not in expense_by_type:
                             expense_by_type[expense_type] = 0
                         expense_by_type[expense_type] += exp.amount
-                    
+
                     # Create single row layout for income and expenses
                     if income_by_type or expense_by_type:
                         # Combine all types into one row
                         all_types = list(income_by_type.items()) + list(expense_by_type.items())
                         if all_types:
-                            type_cols = st.columns(min(len(all_types), 6))  # Max 6 columns for 60% width
-                            for i, (type_name, amount) in enumerate(all_types[:6]):  # Limit to 6 items
+                            type_cols = st.columns(min(len(all_types), 4))  # Max 4 columns for better fit
+                            for i, (type_name, amount) in enumerate(all_types[:4]):  # Limit to 4 items
                                 with type_cols[i]:
                                     icon = "💰" if type_name in [inc[0] for inc in income_by_type.items()] else "💸"
                                     st.metric(f"{icon} {type_name}", f"${amount:,.0f}")
                     else:
                         st.info("No income or expense records found")
-                    
+
                     st.markdown("---")
-                    
-                    # Recent Activity
-                    st.markdown("#### 📋 Recent Activity")
-                    
-                    # Combine recent income and expenses
-                    recent_income = sorted(org_income, key=lambda x: x.transaction_date, reverse=True)[:3]
-                    recent_expenses = sorted(org_expenses, key=lambda x: x.transaction_date, reverse=True)[:3]
-                    
-                    if recent_income or recent_expenses:
-                        # Create horizontal layout for recent transactions
-                        trans_cols = st.columns(2)
-                        
-                        with trans_cols[0]:
-                            st.markdown("**💰 Recent Income**")
-                            if recent_income:
-                                for inc in recent_income:
-                                    prop_name = next((p.name for p in org_properties if p.id == inc.property_id), "Unknown")
-                                    st.write(f"• {prop_name}: ${inc.amount:,.0f}")
-                            else:
-                                st.write("No recent income")
-                        
-                        with trans_cols[1]:
-                            st.markdown("**💸 Recent Expenses**")
-                            if recent_expenses:
-                                for exp in recent_expenses:
-                                    prop_name = next((p.name for p in org_properties if p.id == exp.property_id), "Unknown")
-                                    st.write(f"• {prop_name}: ${exp.amount:,.0f}")
-                            else:
-                                st.write("No recent expenses")
+
+                    # Recent Activity - Last 10 Transactions
+                    st.markdown("#### 📋 Recent Activity (Last 10 Transactions)")
+
+                    # Get all transactions combined
+                    all_transactions = []
+
+                    # Add income transactions
+                    for inc in org_income:
+                        prop_name = next((p.name for p in org_properties if p.id == inc.property_id), "Unknown")
+                        all_transactions.append({
+                            'Property': prop_name,
+                            'Amount': inc.amount,
+                            'Amount_Display': f"${inc.amount:,.2f}",
+                            'Type': inc.income_type.value.title(),
+                            'Category': 'Income',
+                            'Description': inc.description,
+                            'Date': inc.transaction_date,
+                            'Date_Display': inc.transaction_date.strftime('%Y-%m-%d')
+                        })
+
+                    # Add expense transactions
+                    for exp in org_expenses:
+                        prop_name = next((p.name for p in org_properties if p.id == exp.property_id), "Unknown")
+                        all_transactions.append({
+                            'Property': prop_name,
+                            'Amount': exp.amount,
+                            'Amount_Display': f"${exp.amount:,.2f}",
+                            'Type': exp.expense_type.value.title(),
+                            'Category': 'Expense',
+                            'Description': exp.description,
+                            'Date': exp.transaction_date,
+                            'Date_Display': exp.transaction_date.strftime('%Y-%m-%d')
+                        })
+
+                    # Sort by date (most recent first) and take last 10
+                    all_transactions.sort(key=lambda x: x['Date'], reverse=True)
+                    recent_10_transactions = all_transactions[:10]
+
+                    if recent_10_transactions:
+                        # Display the table
+                        df_recent = pd.DataFrame([{
+                            'Property': t['Property'],
+                            'Category': t['Category'],
+                            'Type': t['Type'],
+                            'Amount': t['Amount_Display'],
+                            'Description': t['Description'],
+                            'Date': t['Date_Display']
+                        } for t in recent_10_transactions])
+                        st.dataframe(df_recent, use_container_width=True, hide_index=True)
                     else:
                         st.info("No recent transactions found")
-                
-                with graph_col:
+
+                with right_col:
                     # Create a financial overview chart
                     st.markdown("#### 📈 Financial Summary")
                     
@@ -1842,6 +1971,36 @@ def show_main_app():
                             )
                             
                             st.plotly_chart(pie_fig, use_container_width=True)
+                        
+                        # Add Expenses Breakdown pie chart
+                        st.markdown("#### 💸 Expenses Breakdown")
+                        
+                        # Calculate expenses by type
+                        expenses_by_type = {}
+                        for exp in org_expenses:
+                            expense_type = exp.expense_type.value.title()
+                            if expense_type not in expenses_by_type:
+                                expenses_by_type[expense_type] = 0
+                            expenses_by_type[expense_type] += exp.amount
+                        
+                        if expenses_by_type:
+                            exp_pie_fig = go.Figure(data=[go.Pie(
+                                labels=list(expenses_by_type.keys()),
+                                values=list(expenses_by_type.values()),
+                                hole=0.3,
+                                textinfo='label+percent',
+                                textfont_size=10
+                            )])
+                            
+                            exp_pie_fig.update_layout(
+                                height=250,
+                                margin=dict(l=10, r=10, t=20, b=10),
+                                font=dict(size=9)
+                            )
+                            
+                            st.plotly_chart(exp_pie_fig, use_container_width=True)
+                        else:
+                            st.info("No expense data available for breakdown")
 
     elif selected == "Properties":
         st.markdown('<h1 class="main-header">🏠 Property Management</h1>', unsafe_allow_html=True)
@@ -2276,7 +2435,7 @@ def show_main_app():
         
         with accounting_tabs[0]:  # Income
             st.markdown('<h2 class="main-header">💰 Income Tracking</h2>', unsafe_allow_html=True)
-            
+
             # Check if demo mode
             is_demo_mode = False
             if st.session_state.user:
@@ -2284,11 +2443,11 @@ def show_main_app():
                     is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
                 else:
                     is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
-            
+        
             if is_demo_mode:
                 # Demo mode - show sample income data
                 st.markdown('<div class="info-box">🎯 <strong>Demo Mode</strong> - Showing sample income data. Sign up to manage your own income!</div>', unsafe_allow_html=True)
-                
+            
                 # Sample income data for demo
                 demo_income = [
                     {'property': 'Downtown Apartment', 'amount': 1800, 'type': 'Rent', 'date': '2024-01-15'},
@@ -2297,154 +2456,264 @@ def show_main_app():
                     {'property': 'Downtown Apartment', 'amount': 1800, 'type': 'Rent', 'date': '2024-02-15'},
                     {'property': 'Suburban House', 'amount': 2200, 'type': 'Rent', 'date': '2024-02-20'},
                 ]
-                
+            
                 # Display demo income data
                 st.markdown("### Sample Income Records")
                 for inc in demo_income:
                     st.write(f"• {inc['property']}: ${inc['amount']:,.2f} - {inc['type']} ({inc['date']})")
-                
+            
                 # Demo income form
                 st.markdown("---")
                 st.markdown("### Add Income Record (Demo)")
-                
+            
                 with st.form("demo_income_form"):
                     col1, col2 = st.columns(2)
-                    
+                
                     with col1:
                         demo_property = st.selectbox("Property", ["Downtown Apartment", "Suburban House", "Commercial Space"], key="demo_property")
                         demo_amount = st.number_input("Amount", value=1500, key="demo_amount")
                         demo_type = st.selectbox("Income Type", ["Rent", "Parking", "Laundry", "Other"], key="demo_type")
-                    
+                
                     with col2:
                         demo_date = st.date_input("Date", value=date.today(), key="demo_date")
                         demo_description = st.text_area("Description", value="Sample income record", key="demo_description")
-                    
+                
                     if st.form_submit_button("Add Demo Income", type="primary"):
                         st.success(f"Demo income record added: ${demo_amount:,.2f} for {demo_property}")
                         st.info("Sign up to add real income records!")
                 return
-            
+        
             st.info(f"Tracking income for: **{org_name}**")
-            
+        
             # Tabs for income management
-            tab1, tab2, tab3 = st.tabs(["View Income", "Add Income", "Manage Income"])
-            
+            tab1, tab2, tab3, tab4 = st.tabs(["View/Edit Income", "Add Income", "Manage Income", "Recurring Income"])
+        
             with tab1:
                 if org_properties:
-                    # Filter controls
-                    col1, col2 = st.columns([2, 2])
+                        # Filter controls
+                        col1, col2 = st.columns([2, 2])
                     
-                    with col1:
-                        # Filter by property
-                        property_names = {prop.id: prop.name for prop in org_properties}
-                        selected_property_id = st.selectbox("Filter by Property", ["All"] + list(property_names.keys()), 
-                                                          format_func=lambda x: "All" if x == "All" else property_names[x],
-                                                          key="income_property_filter")
+                        with col1:
+                            # Filter by property
+                            property_names = {prop.id: prop.name for prop in org_properties}
+                            selected_property_id = st.selectbox("Filter by Property", ["All"] + list(property_names.keys()), 
+                                                               format_func=lambda x: "All" if x == "All" else property_names[x],
+                                                               key="income_property_filter")
                     
-                    with col2:
-                        # Date filter
-                        date_filter_type = st.selectbox(
-                            "Date Filter",
-                            ["Current Month", "All Time", "Custom Range", "This Year", "Last 3 Months"],
-                            key="income_date_filter_type"
-                        )
-                    
-                    # Custom date range (only show if Custom Range is selected)
-                    if date_filter_type == "Custom Range":
-                        col3, col4 = st.columns(2)
-                        with col3:
-                            start_date = st.date_input(
-                                "Start Date",
-                                value=datetime.now().date() - timedelta(days=30),
-                                key="income_start_date"
+                        with col2:
+                            # Date filter
+                            date_filter_type = st.selectbox(
+                                "Date Filter",
+                                ["Current Month", "All Time", "Custom Range", "This Year", "Last 3 Months"],
+                                key="income_date_filter_type"
                             )
-                        with col4:
-                            end_date = st.date_input(
-                                "End Date",
-                                value=datetime.now().date(),
-                                key="income_end_date"
-                            )
-                    else:
-                        start_date = None
-                        end_date = None
                     
-                    # Get income records based on filters
-                    if selected_property_id == "All":
-                        income_records = db.get_all_income()
-                    else:
-                        income_records = db.get_income_by_property(selected_property_id)
-                    
-                    # Apply date filter
-                    if income_records:
-                        filtered_income_records = []
-                        current_date = datetime.now()
+                        # Custom date range (only show if Custom Range is selected)
+                        if date_filter_type == "Custom Range":
+                            col3, col4 = st.columns(2)
+                            with col3:
+                                start_date = st.date_input(
+                                    "Start Date",
+                                    value=datetime.now().date() - timedelta(days=30),
+                                    key="income_start_date"
+                                )
+                            with col4:
+                                end_date = st.date_input(
+                                    "End Date",
+                                    value=datetime.now().date(),
+                                    key="income_end_date"
+                                )
+                        else:
+                            start_date = None
+                            end_date = None
+
+                        # Get income records based on filters
+                        if selected_property_id == "All":
+                            income_records = db.get_all_income()
+                        else:
+                            income_records = db.get_income_by_property(selected_property_id)
+
+                        # Apply date filter
+                        if income_records:
+                            filtered_income_records = []
+                            current_date = datetime.now()
                         
-                        for record in income_records:
-                            record_date = record.transaction_date
+                            for record in income_records:
+                                record_date = record.transaction_date
                             
-                            if date_filter_type == "Current Month":
-                                if record_date.year == current_date.year and record_date.month == current_date.month:
+                                if date_filter_type == "Current Month":
+                                    if record_date.year == current_date.year and record_date.month == current_date.month:
+                                        filtered_income_records.append(record)
+                                elif date_filter_type == "This Year":
+                                    if record_date.year == current_date.year:
+                                        filtered_income_records.append(record)
+                                elif date_filter_type == "Last 3 Months":
+                                    three_months_ago = current_date - timedelta(days=90)
+                                    if record_date >= three_months_ago:
+                                        filtered_income_records.append(record)
+                                elif date_filter_type == "Custom Range" and start_date and end_date:
+                                    if start_date <= record_date.date() <= end_date:
+                                        filtered_income_records.append(record)
+                                elif date_filter_type == "All Time":
                                     filtered_income_records.append(record)
-                            elif date_filter_type == "This Year":
-                                if record_date.year == current_date.year:
-                                    filtered_income_records.append(record)
-                            elif date_filter_type == "Last 3 Months":
-                                three_months_ago = current_date - timedelta(days=90)
-                                if record_date >= three_months_ago:
-                                    filtered_income_records.append(record)
-                            elif date_filter_type == "Custom Range" and start_date and end_date:
-                                if start_date <= record_date.date() <= end_date:
-                                    filtered_income_records.append(record)
-                            elif date_filter_type == "All Time":
-                                filtered_income_records.append(record)
                         
-                        income_records = filtered_income_records
+                            income_records = filtered_income_records
                     
-                    if income_records:
-                        # Display income records
-                        income_data = []
-                        for inc in income_records:
-                            prop_name = property_names.get(inc.property_id, "Unknown")
-                            income_data.append({
-                                'Property': prop_name,
-                                'Amount': f"${inc.amount:,.2f}",
-                                'Type': inc.income_type.title(),
-                                'Description': inc.description,
-                                'Date': inc.transaction_date.strftime('%Y-%m-%d')
-                            })
-                        
-                        df_income = pd.DataFrame(income_data)
-                        st.dataframe(df_income, use_container_width=True)
-                        
-                        # Income summary
-                        total_income = sum(inc.amount for inc in income_records)
-                        st.metric("Total Income", f"${total_income:,.2f}")
-                    else:
-                        st.info("No income records found.")
+                        if income_records:
+                            # Display income records with edit/delete functionality
+                            st.markdown(f"**Found {len(income_records)} income transactions**")
+
+                            # Display income transactions with edit/delete buttons
+                            for inc in income_records:
+                                with st.container():
+                                    st.markdown("---")
+                                
+                                    # Income header
+                                    col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+                                
+                                    with col1:
+                                        prop_name = property_names.get(inc.property_id, "Unknown Property")
+                                        st.markdown(f"### 💰 {inc.income_type.value.title()}")
+                                        st.markdown(f"**Property:** {prop_name}")
+                                        st.markdown(f"**Description:** {inc.description}")
+                                
+                                    with col2:
+                                        st.markdown("**Amount**")
+                                        st.markdown(f"${inc.amount:,.2f}")
+                                
+                                    with col3:
+                                        st.markdown("**Date**")
+                                        st.markdown(inc.transaction_date.strftime('%Y-%m-%d'))
+                                
+                                    with col4:
+                                        st.markdown("**Actions**")
+                                        action_col1, action_col2 = st.columns(2)
+                                    
+                                        with action_col1:
+                                            if st.button("✏️ Edit", key=f"edit_income_{inc.id}"):
+                                                st.session_state[f"editing_income_{inc.id}"] = True
+                                                st.rerun()
+                                    
+                                        with action_col2:
+                                            if st.button("🗑️ Delete", key=f"delete_income_{inc.id}", type="secondary"):
+                                                st.session_state[f"confirm_delete_income_{inc.id}"] = True
+                                                st.rerun()
+                            
+                                # Confirmation dialog for deletion
+                                if st.session_state.get(f"confirm_delete_income_{inc.id}", False):
+                                    st.warning(f"⚠️ Are you sure you want to delete this income transaction? This action cannot be undone!")
+                                
+                                    confirm_col1, confirm_col2 = st.columns([1, 1])
+                                
+                                    with confirm_col1:
+                                        if st.button("✅ Yes, Delete", key=f"confirm_yes_income_{inc.id}", type="primary"):
+                                            try:
+                                                    # Delete the income record
+                                                    success = db.client.table("income").delete().eq("id", inc.id).execute()
+                                                    if success.data:
+                                                        st.success("Income transaction deleted successfully!")
+                                                        # Clear the confirmation state
+                                                        if f"confirm_delete_income_{inc.id}" in st.session_state:
+                                                            del st.session_state[f"confirm_delete_income_{inc.id}"]
+                                                        st.rerun()
+                                                    else:
+                                                        st.error("Failed to delete income transaction. Please try again.")
+                                            except Exception as e:
+                                                st.error(f"Error deleting income transaction: {str(e)}")
+                                
+                                    with confirm_col2:
+                                        if st.button("❌ Cancel", key=f"confirm_no_income_{inc.id}"):
+                                            # Clear the confirmation state
+                                            if f"confirm_delete_income_{inc.id}" in st.session_state:
+                                                del st.session_state[f"confirm_delete_income_{inc.id}"]
+                                            st.rerun()
+                                
+                                    # Edit income form
+                                    if st.session_state.get(f"editing_income_{inc.id}", False):
+                                        st.markdown("#### ✏️ Edit Income Transaction")
+                                    
+                                        with st.form(f"edit_income_form_{inc.id}"):
+                                            edit_col1, edit_col2 = st.columns(2)
+                                        
+                                            with edit_col1:
+                                                edit_property_id = st.selectbox(
+                                                    "Property",
+                                                    options=[prop.id for prop in org_properties],
+                                                    format_func=lambda x: property_names[x],
+                                                    index=[prop.id for prop in org_properties].index(inc.property_id) if inc.property_id in [prop.id for prop in org_properties] else 0,
+                                                    key=f"edit_income_property_{inc.id}"
+                                                )
+                                                edit_amount = st.number_input("Amount", value=float(inc.amount), key=f"edit_income_amount_{inc.id}")
+                                                edit_type = st.selectbox("Income Type", [it.value for it in IncomeType], 
+                                                                       index=[it.value for it in IncomeType].index(inc.income_type.value),
+                                                                       key=f"edit_income_type_{inc.id}")
+                                        
+                                            with edit_col2:
+                                                edit_description = st.text_input("Description", value=inc.description, key=f"edit_income_desc_{inc.id}")
+                                                edit_date = st.date_input("Transaction Date", value=inc.transaction_date.date(), key=f"edit_income_date_{inc.id}")
+                                        
+                                            edit_form_col1, edit_form_col2 = st.columns(2)
+                                        
+                                            with edit_form_col1:
+                                                if st.form_submit_button("💾 Save Changes", type="primary"):
+                                                    try:
+                                                        # Update the income record
+                                                        update_data = {
+                                                            "property_id": edit_property_id,
+                                                            "amount": edit_amount,
+                                                            "income_type": edit_type,
+                                                            "description": edit_description,
+                                                            "transaction_date": edit_date.isoformat()
+                                                        }
+                                                    
+                                                        result = db.client.table("income").update(update_data).eq("id", inc.id).execute()
+                                                        if result.data:
+                                                            st.success("Income transaction updated successfully!")
+                                                            # Clear the editing state
+                                                            if f"editing_income_{inc.id}" in st.session_state:
+                                                                del st.session_state[f"editing_income_{inc.id}"]
+                                                            st.rerun()
+                                                        else:
+                                                            st.error("Failed to update income transaction. Please try again.")
+                                                    except Exception as e:
+                                                        st.error(f"Error updating income transaction: {str(e)}")
+                                        
+                                            with edit_form_col2:
+                                                if st.form_submit_button("❌ Cancel"):
+                                                    # Clear the editing state
+                                                    if f"editing_income_{inc.id}" in st.session_state:
+                                                        del st.session_state[f"editing_income_{inc.id}"]
+                                                    st.rerun()
+
+                            # Income summary
+                            total_income = sum(inc.amount for inc in income_records)
+                            st.metric("Total Income", f"${total_income:,.2f}")
+                        else:
+                            st.info("No income records found.")
                 else:
                     st.info(f"No properties found for {org_name}. Please add a property first.")
-            
+        
             with tab2:
                 if org_properties:
                     st.subheader("Add New Income Record")
-                    
+                
                     # Use a key to reset form after successful submission
                     income_form_key = f"add_income_form_{st.session_state.get('income_form_reset_counter', 0)}"
-                    
+                
                     with st.form(income_form_key):
                         col1, col2 = st.columns(2)
-                        
+                    
                         with col1:
                             property_id = st.selectbox("Property *", 
                                                      options=[prop.id for prop in org_properties],
                                                      format_func=lambda x: next(prop.name for prop in org_properties if prop.id == x))
                             amount = st.number_input("Amount *", min_value=0.01, format="%.2f")
                             income_type = st.selectbox("Income Type *", [it.value for it in IncomeType])
-                        
+                    
                         with col2:
                             description = st.text_input("Description *", placeholder="e.g., Monthly rent payment")
                             transaction_date = st.date_input("Transaction Date *", value=date.today())
-                        
+                    
                         # Month and Year selection
                         col3, col4 = st.columns(2)
                         with col3:
@@ -2457,13 +2726,13 @@ def show_main_app():
                                                  min_value=2020, 
                                                  max_value=2030, 
                                                  value=date.today().year)
-                        
+                    
                         submitted = st.form_submit_button("Add Income", type="primary")
-                        
+                    
                         if submitted:
                             # Create transaction date from month/year selection
                             transaction_date_from_month_year = date(year, month, 1)
-                            
+                        
                             new_income = Income(
                                 property_id=property_id,
                                 amount=amount,
@@ -2471,7 +2740,7 @@ def show_main_app():
                                 description=f"{description} - {date(year, month, 1).strftime('%B %Y')}",
                                 transaction_date=datetime.combine(transaction_date_from_month_year, datetime.min.time())
                             )
-                            
+                        
                             # Get user ID and organization ID for RLS compliance
                             user_id = None
                             organization_id = None
@@ -2480,10 +2749,10 @@ def show_main_app():
                                     user_id = st.session_state.user.id
                                 elif isinstance(st.session_state.user, dict):
                                     user_id = st.session_state.user.get('id')
-                            
+                        
                             # Get selected organization
                             organization_id = st.session_state.get('selected_organization')
-                            
+                        
                             result = db.create_income(new_income, user_id, organization_id)
                             if result:
                                 st.success("Income record added successfully!")
@@ -2494,262 +2763,535 @@ def show_main_app():
                                 st.error("Failed to add income record. Please try again.")
                 else:
                     st.info(f"No properties found for {org_name}. Please add a property first.")
-            
-            with tab3:  # Manage Income
-                st.markdown('<h3 class="main-header">📝 Manage Income Transactions</h3>', unsafe_allow_html=True)
+    
+                with tab3:  # Manage Income - Recurring Income Setup
+                    st.markdown('<h3 class="main-header">🔄 Recurring Income Setup</h3>', unsafe_allow_html=True)
                 
-                # Check if demo mode
-                is_demo_mode = False
-                if st.session_state.user:
-                    if hasattr(st.session_state.user, 'email'):
-                        is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
-                    else:
-                        is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
+                    # Check if demo mode
+                    is_demo_mode = False
+                    if st.session_state.user:
+                        if hasattr(st.session_state.user, 'email'):
+                            is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
+                        else:
+                            is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
                 
-                if is_demo_mode:
-                    st.info("🎯 Demo mode - Sign up to manage your own income transactions!")
-                    return
+                    if is_demo_mode:
+                        st.info("🎯 Demo mode - Sign up to set up recurring income!")
+                        return
                 
-                st.info(f"Managing income transactions for: **{org_name}**")
+                    st.info(f"Set up recurring income for: **{org_name}**")
                 
-                # Get income records for the organization
-                try:
-                    all_income = db.get_all_income()
-                    org_income = [inc for inc in all_income if inc.organization_id == selected_org_id]
+                    # Get properties for the organization
+                    try:
+                        org_properties = db.get_properties_by_organization(selected_org_id)
                     
-                    if org_income:
-                        st.markdown(f"**Found {len(org_income)} income transactions**")
+                        if org_properties:
+                            st.markdown("---")
+                            st.markdown("#### ➕ Add New Recurring Income")
                         
-                        # Income filter section
-                        st.markdown("---")
-                        st.markdown("#### 🔍 Filter Income Transactions")
-                        
-                        # Create filter options
-                        filter_col1, filter_col2, filter_col3, filter_col4 = st.columns([2, 1, 1, 1])
-                        
-                        with filter_col1:
-                            # Property filter
-                            org_properties = db.get_properties_by_organization(selected_org_id)
-                            property_names = {prop.id: prop.name for prop in org_properties}
-                            income_property_filter = st.selectbox(
-                                "Filter by Property",
-                                ["All Properties"] + list(property_names.keys()),
-                                format_func=lambda x: "All Properties" if x == "All Properties" else property_names[x],
-                                key="manage_income_property_filter"
-                            )
-                        
-                        with filter_col2:
-                            # Income type filter
-                            income_types = list(set([inc.income_type.value for inc in org_income]))
-                            income_type_filter = st.selectbox(
-                                "Filter by Type",
-                                ["All Types"] + income_types,
-                                key="manage_income_type_filter"
-                            )
-                        
-                        with filter_col3:
-                            # Date filter
-                            income_date_filter = st.selectbox(
-                                "Date Filter",
-                                ["Current Month", "All Time", "Custom Range", "Last 3 Months", "Last 6 Months", "Last Year"],
-                                key="manage_income_date_filter"
-                            )
-                        
-                        with filter_col4:
-                            # Sort options
-                            income_sort = st.selectbox(
-                                "Sort by",
-                                ["Date (Newest)", "Date (Oldest)", "Amount (High-Low)", "Amount (Low-High)", "Property A-Z"],
-                                key="manage_income_sort_filter"
-                            )
-                        
-                        # Custom date range inputs (shown only when Custom Range is selected)
-                        custom_start_date = None
-                        custom_end_date = None
-                        if income_date_filter == "Custom Range":
-                            custom_date_col1, custom_date_col2 = st.columns(2)
-                            with custom_date_col1:
-                                custom_start_date = st.date_input("Start Date", value=date.today().replace(day=1), key="manage_income_start_date")
-                            with custom_date_col2:
-                                custom_end_date = st.date_input("End Date", value=date.today(), key="manage_income_end_date")
-                        
-                        # Filter and sort income records
-                        filtered_income = org_income.copy()
-                        
-                        # Apply property filter
-                        if income_property_filter != "All Properties":
-                            filtered_income = [inc for inc in filtered_income if inc.property_id == income_property_filter]
-                        
-                        # Apply type filter
-                        if income_type_filter != "All Types":
-                            filtered_income = [inc for inc in filtered_income if inc.income_type.value == income_type_filter]
-                        
-                        # Apply date filter
-                        if income_date_filter == "Current Month":
-                            current_month_start = date.today().replace(day=1)
-                            current_month_end = date.today()
-                            filtered_income = [inc for inc in filtered_income if current_month_start <= inc.transaction_date.date() <= current_month_end]
-                        elif income_date_filter == "Last 3 Months":
-                            three_months_ago = date.today() - timedelta(days=90)
-                            filtered_income = [inc for inc in filtered_income if inc.transaction_date.date() >= three_months_ago]
-                        elif income_date_filter == "Last 6 Months":
-                            six_months_ago = date.today() - timedelta(days=180)
-                            filtered_income = [inc for inc in filtered_income if inc.transaction_date.date() >= six_months_ago]
-                        elif income_date_filter == "Last Year":
-                            one_year_ago = date.today() - timedelta(days=365)
-                            filtered_income = [inc for inc in filtered_income if inc.transaction_date.date() >= one_year_ago]
-                        elif income_date_filter == "Custom Range" and custom_start_date and custom_end_date:
-                            filtered_income = [inc for inc in filtered_income if custom_start_date <= inc.transaction_date.date() <= custom_end_date]
-                        
-                        # Apply sorting
-                        if income_sort == "Date (Newest)":
-                            filtered_income.sort(key=lambda x: x.transaction_date, reverse=True)
-                        elif income_sort == "Date (Oldest)":
-                            filtered_income.sort(key=lambda x: x.transaction_date)
-                        elif income_sort == "Amount (High-Low)":
-                            filtered_income.sort(key=lambda x: x.amount, reverse=True)
-                        elif income_sort == "Amount (Low-High)":
-                            filtered_income.sort(key=lambda x: x.amount)
-                        elif income_sort == "Property A-Z":
-                            filtered_income.sort(key=lambda x: property_names.get(x.property_id, "Unknown"))
-                        
-                        # Display filter results
-                        if income_property_filter != "All Properties" or income_type_filter != "All Types" or income_date_filter != "All Time":
-                            st.info(f"Showing {len(filtered_income)} of {len(org_income)} income transactions")
-                        
-                        st.markdown("---")
-                        
-                        # Display income transactions
-                        for inc in filtered_income:
-                            with st.container():
-                                st.markdown("---")
-                                
-                                # Income header
-                                col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
-                                
+                            with st.form("recurring_income_form"):
+                                col1, col2 = st.columns(2)
+                            
                                 with col1:
-                                    prop_name = property_names.get(inc.property_id, "Unknown Property")
-                                    st.markdown(f"### 💰 {inc.income_type.value.title()}")
-                                    st.markdown(f"**Property:** {prop_name}")
-                                    st.markdown(f"**Description:** {inc.description}")
+                                    # Property selection
+                                    property_names = {prop.id: prop.name for prop in org_properties}
+                                    selected_property_id = st.selectbox(
+                                        "Property *",
+                                        options=[prop.id for prop in org_properties],
+                                        format_func=lambda x: property_names[x],
+                                        key="recurring_income_property"
+                                    )
                                 
+                                    # Income type
+                                    income_type = st.selectbox(
+                                        "Income Type *",
+                                        [it.value for it in IncomeType],
+                                        key="recurring_income_type"
+                                    )
+                                
+                                    # Amount
+                                    amount = st.number_input(
+                                        "Amount *",
+                                        min_value=0.01,
+                                        step=0.01,
+                                        format="%.2f",
+                                        key="recurring_income_amount"
+                                    )
+                            
                                 with col2:
-                                    st.markdown("**Amount**")
-                                    st.markdown(f"${inc.amount:,.2f}")
+                                    # Description
+                                    description = st.text_input(
+                                        "Description *",
+                                        placeholder="e.g., Monthly Rent",
+                                        key="recurring_income_description"
+                                    )
                                 
-                                with col3:
-                                    st.markdown("**Date**")
-                                    st.markdown(inc.transaction_date.strftime('%Y-%m-%d'))
+                                    # Interval
+                                    from database.models import RecurringInterval
+                                    interval = st.selectbox(
+                                        "Recurring Interval *",
+                                        [interval.value for interval in RecurringInterval],
+                                        key="recurring_income_interval"
+                                    )
                                 
-                                with col4:
-                                    st.markdown("**Actions**")
-                                    action_col1, action_col2 = st.columns(2)
-                                    
-                                    with action_col1:
-                                        if st.button("✏️ Edit", key=f"edit_income_{inc.id}"):
-                                            st.session_state[f"editing_income_{inc.id}"] = True
-                                            st.rerun()
-                                    
-                                    with action_col2:
-                                        if st.button("🗑️ Delete", key=f"delete_income_{inc.id}", type="secondary"):
-                                            st.session_state[f"confirm_delete_income_{inc.id}"] = True
-                                            st.rerun()
+                                    # Start date
+                                    start_date = st.date_input(
+                                        "Start Date *",
+                                        value=date.today(),
+                                        key="recurring_income_start_date"
+                                    )
+                            
+                                # End date (optional)
+                                end_date = st.date_input(
+                                    "End Date (Optional)",
+                                    value=None,
+                                    key="recurring_income_end_date"
+                                )
+                            
+                                # Submit button
+                                if st.form_submit_button("🔄 Create Recurring Income", type="primary"):
+                                    if selected_property_id and income_type and amount and description and interval and start_date:
+                                        try:
+                                            # Create recurring transaction
+                                            recurring_data = {
+                                                "organization_id": selected_org_id,
+                                                "property_id": selected_property_id,
+                                                "transaction_type": "income",
+                                                "income_type": income_type,
+                                                "amount": amount,
+                                                "description": description,
+                                                "interval": interval,
+                                                "start_date": start_date.isoformat(),
+                                                "end_date": end_date.isoformat() if end_date else None,
+                                                "is_active": True
+                                            }
+                                        
+                                            result = db.client.table("recurring_transactions").insert(recurring_data).execute()
+                                            if result.data:
+                                                st.success("✅ Recurring income setup created successfully!")
+                                                st.rerun()
+                                            else:
+                                                st.error("Failed to create recurring income setup. Please try again.")
+                                        except Exception as e:
+                                            st.error(f"Error creating recurring income: {str(e)}")
+                                    else:
+                                        st.error("Please fill in all required fields.")
+                        
+                            st.markdown("---")
+                            st.markdown("#### 📋 Existing Recurring Income")
+                        
+                            # Display existing recurring income
+                            try:
+                                recurring_income = db.client.table("recurring_transactions").select("*").eq("organization_id", selected_org_id).eq("transaction_type", "income").eq("is_active", True).execute()
+                            
+                                if recurring_income.data:
+                                    for recurring in recurring_income.data:
+                                        with st.expander(f"🔄 {recurring['description']} - {property_names.get(recurring['property_id'], 'Unknown Property')}"):
+                                            col1, col2, col3 = st.columns(3)
+                                        
+                                            with col1:
+                                                st.write(f"**Amount:** ${recurring['amount']:,.2f}")
+                                                st.write(f"**Type:** {recurring['income_type'].title()}")
+                                        
+                                            with col2:
+                                                st.write(f"**Interval:** {recurring['interval'].title()}")
+                                                st.write(f"**Start:** {recurring['start_date']}")
+                                        
+                                            with col3:
+                                                st.write(f"**End:** {recurring['end_date'] if recurring['end_date'] else 'No end date'}")
+                                            
+                                                # Action buttons
+                                                action_col1, action_col2 = st.columns(2)
+                                            
+                                                with action_col1:
+                                                    if st.button("✏️ Edit", key=f"edit_recurring_income_{recurring['id']}"):
+                                                        st.session_state[f"editing_recurring_income_{recurring['id']}"] = True
+                                                        st.rerun()
+                                            
+                                                with action_col2:
+                                                    if st.button("🗑️ Delete", key=f"delete_recurring_income_{recurring['id']}", type="secondary"):
+                                                        st.session_state[f"confirm_delete_recurring_income_{recurring['id']}"] = True
+                                                        st.rerun()
+                                        
+                                            # Confirmation dialog for deletion
+                                            if st.session_state.get(f"confirm_delete_recurring_income_{recurring['id']}", False):
+                                                st.warning("⚠️ Are you sure you want to delete this recurring income setup?")
+                                            
+                                                confirm_col1, confirm_col2 = st.columns(2)
+                                            
+                                                with confirm_col1:
+                                                    if st.button("✅ Yes, Delete", key=f"confirm_yes_recurring_income_{recurring['id']}", type="primary"):
+                                                        try:
+                                                            # Deactivate recurring transaction
+                                                            db.client.table("recurring_transactions").update({"is_active": False}).eq("id", recurring['id']).execute()
+                                                            st.success("Recurring income setup deleted successfully!")
+                                                            if f"confirm_delete_recurring_income_{recurring['id']}" in st.session_state:
+                                                                del st.session_state[f"confirm_delete_recurring_income_{recurring['id']}"]
+                                                            st.rerun()
+                                                        except Exception as e:
+                                                            st.error(f"Error deleting recurring income: {str(e)}")
+                                            
+                                                with confirm_col2:
+                                                    if st.button("❌ Cancel", key=f"confirm_no_recurring_income_{recurring['id']}"):
+                                                        if f"confirm_delete_recurring_income_{recurring['id']}" in st.session_state:
+                                                            del st.session_state[f"confirm_delete_recurring_income_{recurring['id']}"]
+                                                        st.rerun()
+                                        
+                                            # Edit form
+                                            if st.session_state.get(f"editing_recurring_income_{recurring['id']}", False):
+                                                st.markdown("#### ✏️ Edit Recurring Income")
+                                            
+                                                with st.form(f"edit_recurring_income_form_{recurring['id']}"):
+                                                    edit_col1, edit_col2 = st.columns(2)
+                                                
+                                                    with edit_col1:
+                                                        edit_property_id = st.selectbox(
+                                                            "Property",
+                                                            options=[prop.id for prop in org_properties],
+                                                            format_func=lambda x: property_names[x],
+                                                            index=[prop.id for prop in org_properties].index(recurring['property_id']) if recurring['property_id'] in [prop.id for prop in org_properties] else 0,
+                                                            key=f"edit_recurring_property_{recurring['id']}"
+                                                        )
+                                                        edit_amount = st.number_input("Amount", value=float(recurring['amount']), key=f"edit_recurring_amount_{recurring['id']}")
+                                                        edit_type = st.selectbox("Income Type", [it.value for it in IncomeType], 
+                                                                               index=[it.value for it in IncomeType].index(recurring['income_type']),
+                                                                               key=f"edit_recurring_type_{recurring['id']}")
+                                                
+                                                    with edit_col2:
+                                                        edit_description = st.text_input("Description", value=recurring['description'], key=f"edit_recurring_desc_{recurring['id']}")
+                                                        edit_interval = st.selectbox("Interval", [interval.value for interval in RecurringInterval], 
+                                                                                    index=[interval.value for interval in RecurringInterval].index(recurring['interval']),
+                                                                                    key=f"edit_recurring_interval_{recurring['id']}")
+                                                        edit_start_date = st.date_input("Start Date", value=datetime.fromisoformat(recurring['start_date']).date(), key=f"edit_recurring_start_{recurring['id']}")
+                                                
+                                                    edit_end_date = st.date_input("End Date (Optional)", value=datetime.fromisoformat(recurring['end_date']).date() if recurring['end_date'] else None, key=f"edit_recurring_end_{recurring['id']}")
+                                                
+                                                    edit_form_col1, edit_form_col2 = st.columns(2)
+                                                
+                                                    with edit_form_col1:
+                                                        if st.form_submit_button("💾 Save Changes", type="primary"):
+                                                            try:
+                                                                update_data = {
+                                                                    "property_id": edit_property_id,
+                                                                    "amount": edit_amount,
+                                                                    "income_type": edit_type,
+                                                                    "description": edit_description,
+                                                                    "interval": edit_interval,
+                                                                    "start_date": edit_start_date.isoformat(),
+                                                                    "end_date": edit_end_date.isoformat() if edit_end_date else None
+                                                                }
+                                                            
+                                                                result = db.client.table("recurring_transactions").update(update_data).eq("id", recurring['id']).execute()
+                                                                if result.data:
+                                                                    st.success("Recurring income updated successfully!")
+                                                                    if f"editing_recurring_income_{recurring['id']}" in st.session_state:
+                                                                        del st.session_state[f"editing_recurring_income_{recurring['id']}"]
+                                                                    st.rerun()
+                                                                else:
+                                                                    st.error("Failed to update recurring income. Please try again.")
+                                                            except Exception as e:
+                                                                st.error(f"Error updating recurring income: {str(e)}")
+                                                
+                                                    with edit_form_col2:
+                                                        if st.form_submit_button("❌ Cancel"):
+                                                            if f"editing_recurring_income_{recurring['id']}" in st.session_state:
+                                                                del st.session_state[f"editing_recurring_income_{recurring['id']}"]
+                                                            st.rerun()
+                                else:
+                                    st.info("No recurring income setups found. Create your first one above.")
                                 
-                                # Confirmation dialog for deletion
-                                if st.session_state.get(f"confirm_delete_income_{inc.id}", False):
-                                    st.warning(f"⚠️ Are you sure you want to delete this income transaction? This action cannot be undone!")
-                                    
-                                    confirm_col1, confirm_col2 = st.columns([1, 1])
-                                    
-                                    with confirm_col1:
-                                        if st.button("✅ Yes, Delete", key=f"confirm_yes_income_{inc.id}", type="primary"):
-                                            try:
-                                                # Delete the income record
-                                                success = db.client.table("income").delete().eq("id", inc.id).execute()
-                                                if success.data:
-                                                    st.success("Income transaction deleted successfully!")
-                                                    # Clear the confirmation state
-                                                    if f"confirm_delete_income_{inc.id}" in st.session_state:
-                                                        del st.session_state[f"confirm_delete_income_{inc.id}"]
-                                                    st.rerun()
-                                                else:
-                                                    st.error("Failed to delete income transaction. Please try again.")
-                                            except Exception as e:
-                                                st.error(f"Error deleting income transaction: {str(e)}")
-                                    
-                                    with confirm_col2:
-                                        if st.button("❌ Cancel", key=f"confirm_no_income_{inc.id}"):
-                                            # Clear the confirmation state
-                                            if f"confirm_delete_income_{inc.id}" in st.session_state:
-                                                del st.session_state[f"confirm_delete_income_{inc.id}"]
-                                            st.rerun()
+                            except Exception as e:
+                                st.error(f"Error loading recurring income: {str(e)}")
+                    
+                        else:
+                            st.info(f"No properties found for {org_name}. Please add a property first.")
+                    
+                    except Exception as e:
+                        st.error(f"Error loading properties: {str(e)}")
+            
+                with tab4:  # Recurring Income - Pending Transactions
+                    st.markdown('<h3 class="main-header">🔄 Recurring Income - Pending Transactions</h3>', unsafe_allow_html=True)
+                
+                    # Generate pending transactions button
+                    col1, col2 = st.columns([1, 4])
+                    with col1:
+                        if st.button("🔄 Generate Pending Transactions", help="Generate pending transactions from recurring income schedules"):
+                            if 'selected_organization' in st.session_state:
+                                generated = generate_pending_transactions_for_organization(st.session_state.selected_organization)
+                                if generated > 0:
+                                    st.success(f"Generated {generated} new pending transactions!")
+                                else:
+                                    st.info("No new pending transactions to generate.")
+                            else:
+                                st.error("Please select an organization first.")
+                    with col2:
+                        st.info("💡 Pending transactions are automatically generated from your recurring income schedules. Click the button to generate them manually.")
+                
+                    # Check if demo mode
+                    is_demo_mode = False
+                    if st.session_state.user:
+                        if hasattr(st.session_state.user, 'email'):
+                            is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
+                        else:
+                            is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
+                
+                    if is_demo_mode:
+                        st.info("🎯 Demo mode - Sign up to view recurring income!")
+                        return
+                
+                    st.info(f"Pending recurring income transactions for: **{org_name}**")
+                
+                    # Date filter (default to current month)
+                    col1, col2 = st.columns([2, 1])
+                
+                    with col1:
+                        date_filter_type = st.selectbox(
+                            "Date Filter",
+                            ["Current Month", "All Time", "Custom Range", "Last 3 Months", "Last 6 Months", "Last Year"],
+                            key="recurring_income_date_filter"
+                        )
+                
+                    with col2:
+                        if date_filter_type == "Custom Range":
+                            start_date = st.date_input("Start Date", value=date.today().replace(day=1), key="recurring_income_start_date")
+                            end_date = st.date_input("End Date", value=date.today(), key="recurring_income_end_date")
+                        else:
+                            start_date = None
+                            end_date = None
+                
+                    # Get pending income transactions
+                    try:
+                        pending_income = db.client.table("pending_transactions").select("*").eq("organization_id", selected_org_id).eq("transaction_type", "income").eq("is_confirmed", False).execute()
+                    
+                        if pending_income.data:
+                            # Apply date filter
+                            filtered_pending = []
+                            current_date = datetime.now()
+                        
+                            for pending in pending_income.data:
+                                pending_date = datetime.fromisoformat(pending['transaction_date'].replace('Z', '+00:00'))
+                            
+                                if date_filter_type == "Current Month":
+                                    if pending_date.year == current_date.year and pending_date.month == current_date.month:
+                                        filtered_pending.append(pending)
+                                elif date_filter_type == "This Year":
+                                    if pending_date.year == current_date.year:
+                                        filtered_pending.append(pending)
+                                elif date_filter_type == "Last 3 Months":
+                                    three_months_ago = current_date - timedelta(days=90)
+                                    if pending_date >= three_months_ago:
+                                        filtered_pending.append(pending)
+                                elif date_filter_type == "Last 6 Months":
+                                    six_months_ago = current_date - timedelta(days=180)
+                                    if pending_date >= six_months_ago:
+                                        filtered_pending.append(pending)
+                                elif date_filter_type == "Last Year":
+                                    one_year_ago = current_date - timedelta(days=365)
+                                    if pending_date >= one_year_ago:
+                                        filtered_pending.append(pending)
+                                elif date_filter_type == "Custom Range" and start_date and end_date:
+                                    if start_date <= pending_date.date() <= end_date:
+                                        filtered_pending.append(pending)
+                                elif date_filter_type == "All Time":
+                                    filtered_pending.append(pending)
+                        
+                            st.markdown(f"**Found {len(filtered_pending)} pending income transactions**")
+                        
+                            # Display pending transactions
+                            for pending in filtered_pending:
+                                with st.container():
+                                    st.markdown("---")
                                 
-                                # Edit income form
-                                if st.session_state.get(f"editing_income_{inc.id}", False):
-                                    st.markdown("#### ✏️ Edit Income Transaction")
+                                    # Transaction header - adjusted columns for better spacing
+                                    col1, col2, col3, col4 = st.columns([2, 1, 1, 1.5])
+
+                                    with col1:
+                                        # Get property name
+                                        try:
+                                            prop = db.client.table("properties").select("name").eq("id", pending['property_id']).execute()
+                                            prop_name = prop.data[0]['name'] if prop.data else "Unknown Property"
+                                        except:
+                                            prop_name = "Unknown Property"
+
+                                        st.markdown(f"### 💰 {pending['income_type'].title()}")
+                                        st.markdown(f"**Property:** {prop_name}")
+                                        st.markdown(f"**Description:** {pending['description']}")
+
+                                    with col2:
+                                        st.markdown("**Amount**")
+                                        st.markdown(f"${pending['amount']:,.2f}")
+
+                                    with col3:
+                                        st.markdown("**Date**")
+                                        pending_date = datetime.fromisoformat(pending['transaction_date'].replace('Z', '+00:00'))
+                                        st.markdown(pending_date.strftime('%Y-%m-%d'))
+
+                                    with col4:
+                                        st.markdown("**Actions**")
+                                        # Wrapper to target action buttons with CSS
+                                        st.markdown('<div class="pending-actions">', unsafe_allow_html=True)
+                                        action_col1, action_col2, action_col3 = st.columns(3)
                                     
-                                    with st.form(f"edit_income_form_{inc.id}"):
-                                        edit_col1, edit_col2 = st.columns(2)
-                                        
-                                        with edit_col1:
-                                            edit_property_id = st.selectbox(
-                                                "Property",
-                                                options=[prop.id for prop in org_properties],
-                                                format_func=lambda x: property_names[x],
-                                                index=[prop.id for prop in org_properties].index(inc.property_id) if inc.property_id in [prop.id for prop in org_properties] else 0,
-                                                key=f"edit_income_property_{inc.id}"
-                                            )
-                                            edit_amount = st.number_input("Amount", value=float(inc.amount), key=f"edit_income_amount_{inc.id}")
-                                            edit_type = st.selectbox("Income Type", [it.value for it in IncomeType], 
-                                                                   index=[it.value for it in IncomeType].index(inc.income_type.value),
-                                                                   key=f"edit_income_type_{inc.id}")
-                                        
-                                        with edit_col2:
-                                            edit_description = st.text_input("Description", value=inc.description, key=f"edit_income_desc_{inc.id}")
-                                            edit_date = st.date_input("Transaction Date", value=inc.transaction_date.date(), key=f"edit_income_date_{inc.id}")
-                                        
-                                        edit_form_col1, edit_form_col2 = st.columns(2)
-                                        
-                                        with edit_form_col1:
-                                            if st.form_submit_button("💾 Save Changes", type="primary"):
+                                        with action_col1:
+                                            if st.button("✏️ Edit", key=f"edit_pending_income_{pending['id']}"):
+                                                st.session_state[f"editing_pending_income_{pending['id']}"] = True
+                                                st.rerun()
+                                    
+                                        with action_col2:
+                                            if st.button("🗑️ Delete", key=f"delete_pending_income_{pending['id']}", type="secondary"):
+                                                st.session_state[f"confirm_delete_pending_income_{pending['id']}"] = True
+                                                st.rerun()
+                                    
+                                        with action_col3:
+                                            if st.button("✅ Confirm", key=f"confirm_pending_income_{pending['id']}", type="primary"):
+                                                st.session_state[f"confirm_move_pending_income_{pending['id']}"] = True
+                                                st.rerun()
+                                        st.markdown('</div>', unsafe_allow_html=True)
+                                
+                                    # Confirmation dialog for deletion
+                                    if st.session_state.get(f"confirm_delete_pending_income_{pending['id']}", False):
+                                        st.warning("⚠️ Are you sure you want to delete this pending transaction?")
+                                    
+                                        confirm_col1, confirm_col2 = st.columns(2)
+                                    
+                                        with confirm_col1:
+                                            if st.button("✅ Yes, Delete", key=f"confirm_yes_pending_income_{pending['id']}", type="primary"):
                                                 try:
-                                                    # Update the income record
-                                                    update_data = {
-                                                        "property_id": edit_property_id,
-                                                        "amount": edit_amount,
-                                                        "income_type": edit_type,
-                                                        "description": edit_description,
-                                                        "transaction_date": edit_date.isoformat()
+                                                    # Delete the pending transaction
+                                                    db.client.table("pending_transactions").delete().eq("id", pending['id']).execute()
+                                                    st.success("Pending transaction deleted successfully!")
+                                                    if f"confirm_delete_pending_income_{pending['id']}" in st.session_state:
+                                                        del st.session_state[f"confirm_delete_pending_income_{pending['id']}"]
+                                                    st.rerun()
+                                                except Exception as e:
+                                                    st.error(f"Error deleting pending transaction: {str(e)}")
+                                    
+                                        with confirm_col2:
+                                            if st.button("❌ Cancel", key=f"confirm_no_pending_income_{pending['id']}"):
+                                                if f"confirm_delete_pending_income_{pending['id']}" in st.session_state:
+                                                    del st.session_state[f"confirm_delete_pending_income_{pending['id']}"]
+                                                st.rerun()
+                                
+                                    # Confirmation dialog for moving to regular transactions
+                                    if st.session_state.get(f"confirm_move_pending_income_{pending['id']}", False):
+                                        st.warning("⚠️ This will move this transaction to regular income records. Continue?")
+                                    
+                                        confirm_col1, confirm_col2 = st.columns(2)
+                                    
+                                        with confirm_col1:
+                                            if st.button("✅ Yes, Move", key=f"confirm_yes_move_income_{pending['id']}", type="primary"):
+                                                try:
+                                                    # Move to regular income table
+                                                    # Include user_id to satisfy RLS insert policy
+                                                    current_user_id = None
+                                                    try:
+                                                        current_user_id = getattr(st.session_state.user, 'id', None)
+                                                    except Exception:
+                                                        try:
+                                                            current_user_id = st.session_state.user.get('id', None)
+                                                        except Exception:
+                                                            current_user_id = None
+                                                    income_data = {
+                                                        "user_id": current_user_id,
+                                                        "organization_id": pending['organization_id'],
+                                                        "property_id": pending['property_id'],
+                                                        "amount": pending['amount'],
+                                                        "income_type": pending['income_type'],
+                                                        "description": pending['description'],
+                                                        "transaction_date": pending['transaction_date']
                                                     }
-                                                    
-                                                    result = db.client.table("income").update(update_data).eq("id", inc.id).execute()
+                                                
+                                                    # Insert into income table
+                                                    result = db.client.table("income").insert(income_data).execute()
                                                     if result.data:
-                                                        st.success("Income transaction updated successfully!")
-                                                        # Clear the editing state
-                                                        if f"editing_income_{inc.id}" in st.session_state:
-                                                            del st.session_state[f"editing_income_{inc.id}"]
+                                                        # Delete from pending table
+                                                        db.client.table("pending_transactions").delete().eq("id", pending['id']).execute()
+                                                        st.success("Transaction confirmed and moved to regular income!")
+                                                        if f"confirm_move_pending_income_{pending['id']}" in st.session_state:
+                                                            del st.session_state[f"confirm_move_pending_income_{pending['id']}"]
                                                         st.rerun()
                                                     else:
-                                                        st.error("Failed to update income transaction. Please try again.")
+                                                        st.error("Failed to move transaction. Please try again.")
                                                 except Exception as e:
-                                                    st.error(f"Error updating income transaction: {str(e)}")
-                                        
-                                        with edit_form_col2:
-                                            if st.form_submit_button("❌ Cancel"):
-                                                # Clear the editing state
-                                                if f"editing_income_{inc.id}" in st.session_state:
-                                                    del st.session_state[f"editing_income_{inc.id}"]
+                                                    st.error(f"Error moving transaction: {str(e)}")
+                                    
+                                        with confirm_col2:
+                                            if st.button("❌ Cancel", key=f"confirm_no_move_income_{pending['id']}"):
+                                                if f"confirm_move_pending_income_{pending['id']}" in st.session_state:
+                                                    del st.session_state[f"confirm_move_pending_income_{pending['id']}"]
                                                 st.rerun()
-                    
-                    else:
-                        st.info(f"No income transactions found for {org_name}. Add your first income transaction in the 'Add Income' tab.")
-                    
-                except Exception as e:
-                    st.error(f"Error loading income transactions: {str(e)}")
+                                
+                                    # Edit form
+                                    if st.session_state.get(f"editing_pending_income_{pending['id']}", False):
+                                        st.markdown("#### ✏️ Edit Pending Transaction")
+                                    
+                                        with st.form(f"edit_pending_income_form_{pending['id']}"):
+                                            edit_col1, edit_col2 = st.columns(2)
+                                        
+                                            with edit_col1:
+                                                # Get properties for dropdown
+                                                org_properties = db.get_properties_by_organization(selected_org_id)
+                                                property_names = {prop.id: prop.name for prop in org_properties}
+                                            
+                                                edit_property_id = st.selectbox(
+                                                    "Property",
+                                                    options=[prop.id for prop in org_properties],
+                                                    format_func=lambda x: property_names[x],
+                                                    index=[prop.id for prop in org_properties].index(pending['property_id']) if pending['property_id'] in [prop.id for prop in org_properties] else 0,
+                                                    key=f"edit_pending_property_{pending['id']}"
+                                                )
+                                                edit_amount = st.number_input("Amount", value=float(pending['amount']), key=f"edit_pending_amount_{pending['id']}")
+                                                edit_type = st.selectbox("Income Type", [it.value for it in IncomeType], 
+                                                                       index=[it.value for it in IncomeType].index(pending['income_type']),
+                                                                       key=f"edit_pending_type_{pending['id']}")
+                                        
+                                            with edit_col2:
+                                                edit_description = st.text_input("Description", value=pending['description'], key=f"edit_pending_desc_{pending['id']}")
+                                                pending_date = datetime.fromisoformat(pending['transaction_date'].replace('Z', '+00:00'))
+                                                edit_date = st.date_input("Transaction Date", value=pending_date.date(), key=f"edit_pending_date_{pending['id']}")
+                                        
+                                            edit_form_col1, edit_form_col2 = st.columns(2)
+                                        
+                                            with edit_form_col1:
+                                                if st.form_submit_button("💾 Save Changes", type="primary"):
+                                                    try:
+                                                        update_data = {
+                                                            "property_id": edit_property_id,
+                                                            "amount": edit_amount,
+                                                            "income_type": edit_type,
+                                                            "description": edit_description,
+                                                            "transaction_date": edit_date.isoformat()
+                                                        }
+                                                    
+                                                        result = db.client.table("pending_transactions").update(update_data).eq("id", pending['id']).execute()
+                                                        if result.data:
+                                                            st.success("Pending transaction updated successfully!")
+                                                            if f"editing_pending_income_{pending['id']}" in st.session_state:
+                                                                del st.session_state[f"editing_pending_income_{pending['id']}"]
+                                                            st.rerun()
+                                                        else:
+                                                            st.error("Failed to update pending transaction. Please try again.")
+                                                    except Exception as e:
+                                                        st.error(f"Error updating pending transaction: {str(e)}")
+                                        
+                                            with edit_form_col2:
+                                                if st.form_submit_button("❌ Cancel"):
+                                                    if f"editing_pending_income_{pending['id']}" in st.session_state:
+                                                        del st.session_state[f"editing_pending_income_{pending['id']}"]
+                                                    st.rerun()
+                        
+                            # Summary
+                            total_pending = sum(pending['amount'] for pending in filtered_pending)
+                            st.metric("Total Pending Income", f"${total_pending:,.2f}")
+                        else:
+                            st.info("No pending recurring income transactions found.")
+                        
+                    except Exception as e:
+                        st.error(f"Error loading pending transactions: {str(e)}")
         
         with accounting_tabs[1]:  # Expenses
             st.markdown('<h2 class="main-header">💸 Expense Tracking</h2>', unsafe_allow_html=True)
-            
+
             # Check if demo mode
             is_demo_mode = False
             if st.session_state.user:
@@ -2757,11 +3299,11 @@ def show_main_app():
                     is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
                 else:
                     is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
-            
+        
             if is_demo_mode:
                 # Demo mode - show sample expense data
                 st.markdown('<div class="info-box">🎯 <strong>Demo Mode</strong> - Showing sample expense data. Sign up to manage your own expenses!</div>', unsafe_allow_html=True)
-                
+            
                 # Sample expense data for demo
                 demo_expenses = [
                     {'property': 'Downtown Apartment', 'amount': 150, 'type': 'Maintenance', 'date': '2024-01-10'},
@@ -2770,50 +3312,50 @@ def show_main_app():
                     {'property': 'Downtown Apartment', 'amount': 1200, 'type': 'Mortgage', 'date': '2024-02-01'},
                     {'property': 'Suburban House', 'amount': 1800, 'type': 'Mortgage', 'date': '2024-02-01'},
                 ]
-                
+            
                 # Display demo expense data
                 st.markdown("### Sample Expense Records")
                 for exp in demo_expenses:
                     st.write(f"• {exp['property']}: ${exp['amount']:,.2f} - {exp['type']} ({exp['date']})")
-                
+            
                 # Demo expense form
                 st.markdown("---")
                 st.markdown("### Add Expense Record (Demo)")
-                
+            
                 with st.form("demo_expense_form"):
                     col1, col2 = st.columns(2)
-                    
+                
                     with col1:
                         demo_property = st.selectbox("Property", ["Downtown Apartment", "Suburban House", "Commercial Space"], key="demo_exp_property")
                         demo_amount = st.number_input("Amount", value=200, key="demo_exp_amount")
                         demo_type = st.selectbox("Expense Type", ["Maintenance", "Utilities", "Insurance", "Mortgage", "Taxes", "Other"], key="demo_exp_type")
-                    
+                
                     with col2:
                         demo_date = st.date_input("Date", value=date.today(), key="demo_exp_date")
                         demo_description = st.text_area("Description", value="Sample expense record", key="demo_exp_description")
-                    
+                
                     if st.form_submit_button("Add Demo Expense", type="primary"):
                         st.success(f"Demo expense record added: ${demo_amount:,.2f} for {demo_property}")
                         st.info("Sign up to add real expense records!")
                 return
-            
+        
             st.info(f"Tracking expenses for: **{org_name}**")
-            
+
             # Tabs for expense management
-            tab1, tab2, tab3 = st.tabs(["View Expenses", "Add Expense", "Manage Expenses"])
-            
+            tab1, tab2, tab3, tab4 = st.tabs(["View/Edit Expenses", "Add Expense", "Manage Expenses", "Recurring Expenses"])
+
             with tab1:
                 if org_properties:
                     # Filter controls
                     col1, col2 = st.columns([2, 2])
-                    
+
                     with col1:
                         # Filter by property
                         property_names = {prop.id: prop.name for prop in org_properties}
-                        selected_property_id = st.selectbox("Filter by Property", ["All"] + list(property_names.keys()), 
-                                                          format_func=lambda x: "All" if x == "All" else property_names[x],
-                                                          key="expense_property_filter")
-                    
+                        selected_property_id = st.selectbox("Filter by Property", ["All"] + list(property_names.keys()),
+                                                                   format_func=lambda x: "All" if x == "All" else property_names[x],
+                                                                   key="expense_property_filter")
+
                     with col2:
                         # Date filter
                         date_filter_type = st.selectbox(
@@ -2821,7 +3363,7 @@ def show_main_app():
                             ["Current Month", "All Time", "Custom Range", "This Year", "Last 3 Months"],
                             key="expense_date_filter_type"
                         )
-                    
+
                     # Custom date range (only show if Custom Range is selected)
                     if date_filter_type == "Custom Range":
                         col3, col4 = st.columns(2)
@@ -2840,21 +3382,21 @@ def show_main_app():
                     else:
                         start_date = None
                         end_date = None
-                    
+
                     # Get expense records based on filters
                     if selected_property_id == "All":
                         expense_records = db.get_all_expenses()
                     else:
                         expense_records = db.get_expenses_by_property(selected_property_id)
-                    
+
                     # Apply date filter
                     if expense_records:
                         filtered_expense_records = []
                         current_date = datetime.now()
-                        
+
                         for record in expense_records:
                             record_date = record.transaction_date
-                            
+
                             if date_filter_type == "Current Month":
                                 if record_date.year == current_date.year and record_date.month == current_date.month:
                                     filtered_expense_records.append(record)
@@ -2870,25 +3412,135 @@ def show_main_app():
                                     filtered_expense_records.append(record)
                             elif date_filter_type == "All Time":
                                 filtered_expense_records.append(record)
-                        
+
                         expense_records = filtered_expense_records
-                    
+
                     if expense_records:
-                        # Display expense records
-                        expense_data = []
+                        # Display expense records with edit/delete functionality
+                        st.markdown(f"**Found {len(expense_records)} expense transactions**")
+
+                        # Display expense transactions with edit/delete buttons
                         for exp in expense_records:
-                            prop_name = property_names.get(exp.property_id, "Unknown")
-                            expense_data.append({
-                                'Property': prop_name,
-                                'Amount': f"${exp.amount:,.2f}",
-                                'Type': exp.expense_type.title(),
-                                'Description': exp.description,
-                                'Date': exp.transaction_date.strftime('%Y-%m-%d')
-                            })
-                        
-                        df_expense = pd.DataFrame(expense_data)
-                        st.dataframe(df_expense, use_container_width=True)
-                        
+                            with st.container():
+                                    st.markdown("---")
+                                
+                                    # Expense header
+                                    col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+                                
+                                    with col1:
+                                        prop_name = property_names.get(exp.property_id, "Unknown Property")
+                                        st.markdown(f"### 💸 {exp.expense_type.value.title()}")
+                                        st.markdown(f"**Property:** {prop_name}")
+                                        st.markdown(f"**Description:** {exp.description}")
+                                
+                                    with col2:
+                                        st.markdown("**Amount**")
+                                        st.markdown(f"${exp.amount:,.2f}")
+                                
+                                    with col3:
+                                        st.markdown("**Date**")
+                                        st.markdown(exp.transaction_date.strftime('%Y-%m-%d'))
+                                
+                                    with col4:
+                                        st.markdown("**Actions**")
+                                        action_col1, action_col2 = st.columns(2)
+                                    
+                                        with action_col1:
+                                            if st.button("✏️ Edit", key=f"edit_expense_{exp.id}"):
+                                                st.session_state[f"editing_expense_{exp.id}"] = True
+                                                st.rerun()
+                                    
+                                        with action_col2:
+                                            if st.button("🗑️ Delete", key=f"delete_expense_{exp.id}", type="secondary"):
+                                                st.session_state[f"confirm_delete_expense_{exp.id}"] = True
+                                                st.rerun()
+                                
+                                    # Confirmation dialog for deletion
+                                    if st.session_state.get(f"confirm_delete_expense_{exp.id}", False):
+                                        st.warning(f"⚠️ Are you sure you want to delete this expense transaction? This action cannot be undone!")
+                                    
+                                        confirm_col1, confirm_col2 = st.columns([1, 1])
+                                    
+                                        with confirm_col1:
+                                            if st.button("✅ Yes, Delete", key=f"confirm_yes_expense_{exp.id}", type="primary"):
+                                                try:
+                                                    # Delete the expense record
+                                                    success = db.client.table("expenses").delete().eq("id", exp.id).execute()
+                                                    if success.data:
+                                                        st.success("Expense transaction deleted successfully!")
+                                                        # Clear the confirmation state
+                                                        if f"confirm_delete_expense_{exp.id}" in st.session_state:
+                                                            del st.session_state[f"confirm_delete_expense_{exp.id}"]
+                                                        st.rerun()
+                                                    else:
+                                                        st.error("Failed to delete expense transaction. Please try again.")
+                                                except Exception as e:
+                                                    st.error(f"Error deleting expense transaction: {str(e)}")
+                                    
+                                        with confirm_col2:
+                                            if st.button("❌ Cancel", key=f"confirm_no_expense_{exp.id}"):
+                                                # Clear the confirmation state
+                                                if f"confirm_delete_expense_{exp.id}" in st.session_state:
+                                                    del st.session_state[f"confirm_delete_expense_{exp.id}"]
+                                                st.rerun()
+                                
+                                    # Edit expense form
+                                    if st.session_state.get(f"editing_expense_{exp.id}", False):
+                                        st.markdown("#### ✏️ Edit Expense Transaction")
+                                    
+                                        with st.form(f"edit_expense_form_{exp.id}"):
+                                            edit_col1, edit_col2 = st.columns(2)
+                                        
+                                            with edit_col1:
+                                                edit_property_id = st.selectbox(
+                                                    "Property",
+                                                    options=[prop.id for prop in org_properties],
+                                                    format_func=lambda x: property_names[x],
+                                                    index=[prop.id for prop in org_properties].index(exp.property_id) if exp.property_id in [prop.id for prop in org_properties] else 0,
+                                                    key=f"edit_expense_property_{exp.id}"
+                                                )
+                                                edit_amount = st.number_input("Amount", value=float(exp.amount), key=f"edit_expense_amount_{exp.id}")
+                                                edit_type = st.selectbox("Expense Type", [et.value for et in ExpenseType], 
+                                                                       index=[et.value for et in ExpenseType].index(exp.expense_type.value),
+                                                                       key=f"edit_expense_type_{exp.id}")
+                                        
+                                            with edit_col2:
+                                                edit_description = st.text_input("Description", value=exp.description, key=f"edit_expense_desc_{exp.id}")
+                                                edit_date = st.date_input("Transaction Date", value=exp.transaction_date.date(), key=f"edit_expense_date_{exp.id}")
+                                        
+                                            edit_form_col1, edit_form_col2 = st.columns(2)
+                                        
+                                            with edit_form_col1:
+                                                if st.form_submit_button("💾 Save Changes", type="primary"):
+                                                    try:
+                                                        # Update the expense record
+                                                        update_data = {
+                                                            "property_id": edit_property_id,
+                                                            "amount": edit_amount,
+                                                            "expense_type": edit_type,
+                                                            "description": edit_description,
+                                                            "transaction_date": edit_date.isoformat()
+                                                        }
+                                                    
+                                                        result = db.client.table("expenses").update(update_data).eq("id", exp.id).execute()
+                                                        if result.data:
+                                                            st.success("Expense transaction updated successfully!")
+                                                            # Clear the editing state
+                                                            if f"editing_expense_{exp.id}" in st.session_state:
+                                                                del st.session_state[f"editing_expense_{exp.id}"]
+                                                            st.rerun()
+                                                        else:
+                                                            st.error("Failed to update expense transaction. Please try again.")
+                                                    except Exception as e:
+                                                        st.error(f"Error updating expense transaction: {str(e)}")
+                                        
+                                            with edit_form_col2:
+                                                if st.form_submit_button("❌ Cancel"):
+                                                    # Clear the editing state
+                                                    if f"editing_expense_{exp.id}" in st.session_state:
+                                                        del st.session_state[f"editing_expense_{exp.id}"]
+                                                    st.rerun()
+                    
                         # Expense summary
                         total_expenses = sum(exp.amount for exp in expense_records)
                         st.metric("Total Expenses", f"${total_expenses:,.2f}")
@@ -2896,28 +3548,28 @@ def show_main_app():
                         st.info("No expense records found.")
                 else:
                     st.info(f"No properties found for {org_name}. Please add a property first.")
-            
+        
             with tab2:
                 if org_properties:
                     st.subheader("Add New Expense Record")
-                    
+                
                     # Use a key to reset form after successful submission
                     expense_form_key = f"add_expense_form_{st.session_state.get('expense_form_reset_counter', 0)}"
-                    
+                
                     with st.form(expense_form_key):
                         col1, col2 = st.columns(2)
-                        
+                    
                         with col1:
                             property_id = st.selectbox("Property *", 
                                                      options=[prop.id for prop in org_properties],
                                                      format_func=lambda x: next(prop.name for prop in org_properties if prop.id == x))
                             amount = st.number_input("Amount *", min_value=0.01, format="%.2f")
                             expense_type = st.selectbox("Expense Type *", [et.value for et in ExpenseType])
-                        
+                    
                         with col2:
                             description = st.text_input("Description *", placeholder="e.g., Maintenance repair")
                             transaction_date = st.date_input("Transaction Date *", value=date.today())
-                        
+                    
                         # Month and Year selection
                         col3, col4 = st.columns(2)
                         with col3:
@@ -2930,13 +3582,13 @@ def show_main_app():
                                                  min_value=2020, 
                                                  max_value=2030, 
                                                  value=date.today().year)
-                        
+                    
                         submitted = st.form_submit_button("Add Expense", type="primary")
-                        
+                    
                         if submitted:
                             # Create transaction date from month/year selection
                             transaction_date_from_month_year = date(year, month, 1)
-                            
+                        
                             new_expense = Expense(
                                 property_id=property_id,
                                 amount=amount,
@@ -2944,7 +3596,7 @@ def show_main_app():
                                 description=f"{description} - {date(year, month, 1).strftime('%B %Y')}",
                                 transaction_date=datetime.combine(transaction_date_from_month_year, datetime.min.time())
                             )
-                            
+                        
                             # Get user ID and organization ID for RLS compliance
                             user_id = None
                             organization_id = None
@@ -2953,10 +3605,10 @@ def show_main_app():
                                     user_id = st.session_state.user.id
                                 elif isinstance(st.session_state.user, dict):
                                     user_id = st.session_state.user.get('id')
-                            
+                        
                             # Get selected organization
                             organization_id = st.session_state.get('selected_organization')
-                            
+                        
                             result = db.create_expense(new_expense, user_id, organization_id)
                             if result:
                                 st.success("Expense record added successfully!")
@@ -2968,258 +3620,530 @@ def show_main_app():
                 else:
                     st.info(f"No properties found for {org_name}. Please add a property first.")
             
-            with tab3:  # Manage Expenses
-                st.markdown('<h3 class="main-header">📝 Manage Expense Transactions</h3>', unsafe_allow_html=True)
+                with tab3:  # Manage Expenses - Recurring Expense Setup
+                    st.markdown('<h3 class="main-header">🔄 Recurring Expense Setup</h3>', unsafe_allow_html=True)
                 
-                # Check if demo mode
-                is_demo_mode = False
-                if st.session_state.user:
-                    if hasattr(st.session_state.user, 'email'):
-                        is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
-                    else:
-                        is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
+                    # Check if demo mode
+                    is_demo_mode = False
+                    if st.session_state.user:
+                        if hasattr(st.session_state.user, 'email'):
+                            is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
+                        else:
+                            is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
                 
-                if is_demo_mode:
-                    st.info("🎯 Demo mode - Sign up to manage your own expense transactions!")
-                    return
+                    if is_demo_mode:
+                        st.info("🎯 Demo mode - Sign up to set up recurring expenses!")
+                        return
                 
-                st.info(f"Managing expense transactions for: **{org_name}**")
+                    st.info(f"Set up recurring expenses for: **{org_name}**")
                 
-                # Get expense records for the organization
-                try:
-                    all_expenses = db.get_all_expenses()
-                    org_expenses = [exp for exp in all_expenses if exp.organization_id == selected_org_id]
+                    # Get properties for the organization
+                    try:
+                        org_properties = db.get_properties_by_organization(selected_org_id)
                     
-                    if org_expenses:
-                        st.markdown(f"**Found {len(org_expenses)} expense transactions**")
+                        if org_properties:
+                            st.markdown("---")
+                            st.markdown("#### ➕ Add New Recurring Expense")
                         
-                        # Expense filter section
-                        st.markdown("---")
-                        st.markdown("#### 🔍 Filter Expense Transactions")
-                        
-                        # Create filter options
-                        filter_col1, filter_col2, filter_col3, filter_col4 = st.columns([2, 1, 1, 1])
-                        
-                        with filter_col1:
-                            # Property filter
-                            org_properties = db.get_properties_by_organization(selected_org_id)
-                            property_names = {prop.id: prop.name for prop in org_properties}
-                            expense_property_filter = st.selectbox(
-                                "Filter by Property",
-                                ["All Properties"] + list(property_names.keys()),
-                                format_func=lambda x: "All Properties" if x == "All Properties" else property_names[x],
-                                key="manage_expense_property_filter"
-                            )
-                        
-                        with filter_col2:
-                            # Expense type filter
-                            expense_types = list(set([exp.expense_type.value for exp in org_expenses]))
-                            expense_type_filter = st.selectbox(
-                                "Filter by Type",
-                                ["All Types"] + expense_types,
-                                key="manage_expense_type_filter"
-                            )
-                        
-                        with filter_col3:
-                            # Date filter
-                            expense_date_filter = st.selectbox(
-                                "Date Filter",
-                                ["Current Month", "All Time", "Custom Range", "Last 3 Months", "Last 6 Months", "Last Year"],
-                                key="manage_expense_date_filter"
-                            )
-                        
-                        with filter_col4:
-                            # Sort options
-                            expense_sort = st.selectbox(
-                                "Sort by",
-                                ["Date (Newest)", "Date (Oldest)", "Amount (High-Low)", "Amount (Low-High)", "Property A-Z"],
-                                key="manage_expense_sort_filter"
-                            )
-                        
-                        # Custom date range inputs (shown only when Custom Range is selected)
-                        custom_start_date = None
-                        custom_end_date = None
-                        if expense_date_filter == "Custom Range":
-                            custom_date_col1, custom_date_col2 = st.columns(2)
-                            with custom_date_col1:
-                                custom_start_date = st.date_input("Start Date", value=date.today().replace(day=1), key="manage_expense_start_date")
-                            with custom_date_col2:
-                                custom_end_date = st.date_input("End Date", value=date.today(), key="manage_expense_end_date")
-                        
-                        # Filter and sort expense records
-                        filtered_expenses = org_expenses.copy()
-                        
-                        # Apply property filter
-                        if expense_property_filter != "All Properties":
-                            filtered_expenses = [exp for exp in filtered_expenses if exp.property_id == expense_property_filter]
-                        
-                        # Apply type filter
-                        if expense_type_filter != "All Types":
-                            filtered_expenses = [exp for exp in filtered_expenses if exp.expense_type.value == expense_type_filter]
-                        
-                        # Apply date filter
-                        if expense_date_filter == "Current Month":
-                            current_month_start = date.today().replace(day=1)
-                            current_month_end = date.today()
-                            filtered_expenses = [exp for exp in filtered_expenses if current_month_start <= exp.transaction_date.date() <= current_month_end]
-                        elif expense_date_filter == "Last 3 Months":
-                            three_months_ago = date.today() - timedelta(days=90)
-                            filtered_expenses = [exp for exp in filtered_expenses if exp.transaction_date.date() >= three_months_ago]
-                        elif expense_date_filter == "Last 6 Months":
-                            six_months_ago = date.today() - timedelta(days=180)
-                            filtered_expenses = [exp for exp in filtered_expenses if exp.transaction_date.date() >= six_months_ago]
-                        elif expense_date_filter == "Last Year":
-                            one_year_ago = date.today() - timedelta(days=365)
-                            filtered_expenses = [exp for exp in filtered_expenses if exp.transaction_date.date() >= one_year_ago]
-                        elif expense_date_filter == "Custom Range" and custom_start_date and custom_end_date:
-                            filtered_expenses = [exp for exp in filtered_expenses if custom_start_date <= exp.transaction_date.date() <= custom_end_date]
-                        
-                        # Apply sorting
-                        if expense_sort == "Date (Newest)":
-                            filtered_expenses.sort(key=lambda x: x.transaction_date, reverse=True)
-                        elif expense_sort == "Date (Oldest)":
-                            filtered_expenses.sort(key=lambda x: x.transaction_date)
-                        elif expense_sort == "Amount (High-Low)":
-                            filtered_expenses.sort(key=lambda x: x.amount, reverse=True)
-                        elif expense_sort == "Amount (Low-High)":
-                            filtered_expenses.sort(key=lambda x: x.amount)
-                        elif expense_sort == "Property A-Z":
-                            filtered_expenses.sort(key=lambda x: property_names.get(x.property_id, "Unknown"))
-                        
-                        # Display filter results
-                        if expense_property_filter != "All Properties" or expense_type_filter != "All Types" or expense_date_filter != "All Time":
-                            st.info(f"Showing {len(filtered_expenses)} of {len(org_expenses)} expense transactions")
-                        
-                        st.markdown("---")
-                        
-                        # Display expense transactions
-                        for exp in filtered_expenses:
-                            with st.container():
-                                st.markdown("---")
-                                
-                                # Expense header
-                                col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
-                                
+                            with st.form("recurring_expense_form"):
+                                col1, col2 = st.columns(2)
+                            
                                 with col1:
-                                    prop_name = property_names.get(exp.property_id, "Unknown Property")
-                                    st.markdown(f"### 💸 {exp.expense_type.value.title()}")
-                                    st.markdown(f"**Property:** {prop_name}")
-                                    st.markdown(f"**Description:** {exp.description}")
+                                    # Property selection
+                                    property_names = {prop.id: prop.name for prop in org_properties}
+                                    selected_property_id = st.selectbox(
+                                        "Property *",
+                                        options=[prop.id for prop in org_properties],
+                                        format_func=lambda x: property_names[x],
+                                        key="recurring_expense_property"
+                                    )
                                 
+                                    # Expense type
+                                    expense_type = st.selectbox(
+                                        "Expense Type *",
+                                        [et.value for et in ExpenseType],
+                                        key="recurring_expense_type"
+                                    )
+                                
+                                    # Amount
+                                    amount = st.number_input(
+                                        "Amount *",
+                                        min_value=0.01,
+                                        step=0.01,
+                                        format="%.2f",
+                                        key="recurring_expense_amount"
+                                    )
+                            
                                 with col2:
-                                    st.markdown("**Amount**")
-                                    st.markdown(f"${exp.amount:,.2f}")
+                                    # Description
+                                    description = st.text_input(
+                                        "Description *",
+                                        placeholder="e.g., Monthly HOA Fee",
+                                        key="recurring_expense_description"
+                                    )
                                 
-                                with col3:
-                                    st.markdown("**Date**")
-                                    st.markdown(exp.transaction_date.strftime('%Y-%m-%d'))
+                                    # Interval
+                                    from database.models import RecurringInterval
+                                    interval = st.selectbox(
+                                        "Recurring Interval *",
+                                        [interval.value for interval in RecurringInterval],
+                                        key="recurring_expense_interval"
+                                    )
                                 
-                                with col4:
-                                    st.markdown("**Actions**")
-                                    action_col1, action_col2 = st.columns(2)
-                                    
-                                    with action_col1:
-                                        if st.button("✏️ Edit", key=f"edit_expense_{exp.id}"):
-                                            st.session_state[f"editing_expense_{exp.id}"] = True
-                                            st.rerun()
-                                    
-                                    with action_col2:
-                                        if st.button("🗑️ Delete", key=f"delete_expense_{exp.id}", type="secondary"):
-                                            st.session_state[f"confirm_delete_expense_{exp.id}"] = True
-                                            st.rerun()
+                                    # Start date
+                                    start_date = st.date_input(
+                                        "Start Date *",
+                                        value=date.today(),
+                                        key="recurring_expense_start_date"
+                                    )
+                            
+                                # End date (optional)
+                                end_date = st.date_input(
+                                    "End Date (Optional)",
+                                    value=None,
+                                    key="recurring_expense_end_date"
+                                )
+                            
+                                # Submit button
+                                if st.form_submit_button("🔄 Create Recurring Expense", type="primary"):
+                                    if selected_property_id and expense_type and amount and description and interval and start_date:
+                                        try:
+                                            # Create recurring transaction
+                                            recurring_data = {
+                                                "organization_id": selected_org_id,
+                                                "property_id": selected_property_id,
+                                                "transaction_type": "expense",
+                                                "expense_type": expense_type,
+                                                "amount": amount,
+                                                "description": description,
+                                                "interval": interval,
+                                                "start_date": start_date.isoformat(),
+                                                "end_date": end_date.isoformat() if end_date else None,
+                                                "is_active": True
+                                            }
+                                        
+                                            result = db.client.table("recurring_transactions").insert(recurring_data).execute()
+                                            if result.data:
+                                                st.success("✅ Recurring expense setup created successfully!")
+                                                st.rerun()
+                                            else:
+                                                st.error("Failed to create recurring expense setup. Please try again.")
+                                        except Exception as e:
+                                            st.error(f"Error creating recurring expense: {str(e)}")
+                                    else:
+                                        st.error("Please fill in all required fields.")
+                        
+                            st.markdown("---")
+                            st.markdown("#### 📋 Existing Recurring Expenses")
+                        
+                            # Display existing recurring expenses
+                            try:
+                                recurring_expenses = db.client.table("recurring_transactions").select("*").eq("organization_id", selected_org_id).eq("transaction_type", "expense").eq("is_active", True).execute()
+                            
+                                if recurring_expenses.data:
+                                    for recurring in recurring_expenses.data:
+                                        with st.expander(f"🔄 {recurring['description']} - {property_names.get(recurring['property_id'], 'Unknown Property')}"):
+                                            col1, col2, col3 = st.columns(3)
+                                        
+                                            with col1:
+                                                st.write(f"**Amount:** ${recurring['amount']:,.2f}")
+                                                st.write(f"**Type:** {recurring['expense_type'].title()}")
+                                        
+                                            with col2:
+                                                st.write(f"**Interval:** {recurring['interval'].title()}")
+                                                st.write(f"**Start:** {recurring['start_date']}")
+                                        
+                                            with col3:
+                                                st.write(f"**End:** {recurring['end_date'] if recurring['end_date'] else 'No end date'}")
+                                            
+                                                # Action buttons
+                                                action_col1, action_col2 = st.columns(2)
+                                            
+                                                with action_col1:
+                                                    if st.button("✏️ Edit", key=f"edit_recurring_expense_{recurring['id']}"):
+                                                        st.session_state[f"editing_recurring_expense_{recurring['id']}"] = True
+                                                        st.rerun()
+                                            
+                                                with action_col2:
+                                                    if st.button("🗑️ Delete", key=f"delete_recurring_expense_{recurring['id']}", type="secondary"):
+                                                        st.session_state[f"confirm_delete_recurring_expense_{recurring['id']}"] = True
+                                                        st.rerun()
+                                        
+                                            # Confirmation dialog for deletion
+                                            if st.session_state.get(f"confirm_delete_recurring_expense_{recurring['id']}", False):
+                                                st.warning("⚠️ Are you sure you want to delete this recurring expense setup?")
+                                            
+                                                confirm_col1, confirm_col2 = st.columns(2)
+                                            
+                                                with confirm_col1:
+                                                    if st.button("✅ Yes, Delete", key=f"confirm_yes_recurring_expense_{recurring['id']}", type="primary"):
+                                                        try:
+                                                            # Deactivate recurring transaction
+                                                            db.client.table("recurring_transactions").update({"is_active": False}).eq("id", recurring['id']).execute()
+                                                            st.success("Recurring expense setup deleted successfully!")
+                                                            if f"confirm_delete_recurring_expense_{recurring['id']}" in st.session_state:
+                                                                del st.session_state[f"confirm_delete_recurring_expense_{recurring['id']}"]
+                                                            st.rerun()
+                                                        except Exception as e:
+                                                            st.error(f"Error deleting recurring expense: {str(e)}")
+                                            
+                                                with confirm_col2:
+                                                    if st.button("❌ Cancel", key=f"confirm_no_recurring_expense_{recurring['id']}"):
+                                                        if f"confirm_delete_recurring_expense_{recurring['id']}" in st.session_state:
+                                                            del st.session_state[f"confirm_delete_recurring_expense_{recurring['id']}"]
+                                                        st.rerun()
+                                        
+                                            # Edit form
+                                            if st.session_state.get(f"editing_recurring_expense_{recurring['id']}", False):
+                                                st.markdown("#### ✏️ Edit Recurring Expense")
+                                            
+                                                with st.form(f"edit_recurring_expense_form_{recurring['id']}"):
+                                                    edit_col1, edit_col2 = st.columns(2)
+                                                
+                                                    with edit_col1:
+                                                        edit_property_id = st.selectbox(
+                                                            "Property",
+                                                            options=[prop.id for prop in org_properties],
+                                                            format_func=lambda x: property_names[x],
+                                                            index=[prop.id for prop in org_properties].index(recurring['property_id']) if recurring['property_id'] in [prop.id for prop in org_properties] else 0,
+                                                            key=f"edit_recurring_expense_property_{recurring['id']}"
+                                                        )
+                                                        edit_amount = st.number_input("Amount", value=float(recurring['amount']), key=f"edit_recurring_expense_amount_{recurring['id']}")
+                                                        edit_type = st.selectbox("Expense Type", [et.value for et in ExpenseType], 
+                                                                               index=[et.value for et in ExpenseType].index(recurring['expense_type']),
+                                                                               key=f"edit_recurring_expense_type_{recurring['id']}")
+                                                
+                                                    with edit_col2:
+                                                        edit_description = st.text_input("Description", value=recurring['description'], key=f"edit_recurring_expense_desc_{recurring['id']}")
+                                                        edit_interval = st.selectbox("Interval", [interval.value for interval in RecurringInterval], 
+                                                                                    index=[interval.value for interval in RecurringInterval].index(recurring['interval']),
+                                                                                    key=f"edit_recurring_expense_interval_{recurring['id']}")
+                                                        edit_start_date = st.date_input("Start Date", value=datetime.fromisoformat(recurring['start_date']).date(), key=f"edit_recurring_expense_start_{recurring['id']}")
+                                                
+                                                    edit_end_date = st.date_input("End Date (Optional)", value=datetime.fromisoformat(recurring['end_date']).date() if recurring['end_date'] else None, key=f"edit_recurring_expense_end_{recurring['id']}")
+                                                
+                                                    edit_form_col1, edit_form_col2 = st.columns(2)
+                                                
+                                                    with edit_form_col1:
+                                                        if st.form_submit_button("💾 Save Changes", type="primary"):
+                                                            try:
+                                                                update_data = {
+                                                                    "property_id": edit_property_id,
+                                                                    "amount": edit_amount,
+                                                                    "expense_type": edit_type,
+                                                                    "description": edit_description,
+                                                                    "interval": edit_interval,
+                                                                    "start_date": edit_start_date.isoformat(),
+                                                                    "end_date": edit_end_date.isoformat() if edit_end_date else None
+                                                                }
+                                                            
+                                                                result = db.client.table("recurring_transactions").update(update_data).eq("id", recurring['id']).execute()
+                                                                if result.data:
+                                                                    st.success("Recurring expense updated successfully!")
+                                                                    if f"editing_recurring_expense_{recurring['id']}" in st.session_state:
+                                                                        del st.session_state[f"editing_recurring_expense_{recurring['id']}"]
+                                                                    st.rerun()
+                                                                else:
+                                                                    st.error("Failed to update recurring expense. Please try again.")
+                                                            except Exception as e:
+                                                                st.error(f"Error updating recurring expense: {str(e)}")
+                                                
+                                                    with edit_form_col2:
+                                                        if st.form_submit_button("❌ Cancel"):
+                                                            if f"editing_recurring_expense_{recurring['id']}" in st.session_state:
+                                                                del st.session_state[f"editing_recurring_expense_{recurring['id']}"]
+                                                            st.rerun()
+                                else:
+                                    st.info("No recurring expense setups found. Create your first one above.")
                                 
-                                # Confirmation dialog for deletion
-                                if st.session_state.get(f"confirm_delete_expense_{exp.id}", False):
-                                    st.warning(f"⚠️ Are you sure you want to delete this expense transaction? This action cannot be undone!")
-                                    
-                                    confirm_col1, confirm_col2 = st.columns([1, 1])
-                                    
-                                    with confirm_col1:
-                                        if st.button("✅ Yes, Delete", key=f"confirm_yes_expense_{exp.id}", type="primary"):
-                                            try:
-                                                # Delete the expense record
-                                                success = db.client.table("expenses").delete().eq("id", exp.id).execute()
-                                                if success.data:
-                                                    st.success("Expense transaction deleted successfully!")
-                                                    # Clear the confirmation state
-                                                    if f"confirm_delete_expense_{exp.id}" in st.session_state:
-                                                        del st.session_state[f"confirm_delete_expense_{exp.id}"]
-                                                    st.rerun()
-                                                else:
-                                                    st.error("Failed to delete expense transaction. Please try again.")
-                                            except Exception as e:
-                                                st.error(f"Error deleting expense transaction: {str(e)}")
-                                    
-                                    with confirm_col2:
-                                        if st.button("❌ Cancel", key=f"confirm_no_expense_{exp.id}"):
-                                            # Clear the confirmation state
-                                            if f"confirm_delete_expense_{exp.id}" in st.session_state:
-                                                del st.session_state[f"confirm_delete_expense_{exp.id}"]
-                                            st.rerun()
+                            except Exception as e:
+                                st.error(f"Error loading recurring expenses: {str(e)}")
+                    
+                        else:
+                            st.info(f"No properties found for {org_name}. Please add a property first.")
+                    
+                    except Exception as e:
+                        st.error(f"Error loading properties: {str(e)}")
+            
+                with tab4:  # Recurring Expenses - Pending Transactions
+                    st.markdown('<h3 class="main-header">🔄 Recurring Expenses - Pending Transactions</h3>', unsafe_allow_html=True)
+                
+                    # Generate pending transactions button
+                    col1, col2 = st.columns([1, 4])
+                    with col1:
+                        if st.button("🔄 Generate Pending Transactions", key="generate_expense_pending", help="Generate pending transactions from recurring expense schedules"):
+                            if 'selected_organization' in st.session_state:
+                                generated = generate_pending_transactions_for_organization(st.session_state.selected_organization)
+                                if generated > 0:
+                                    st.success(f"Generated {generated} new pending transactions!")
+                                else:
+                                    st.info("No new pending transactions to generate.")
+                            else:
+                                st.error("Please select an organization first.")
+                    with col2:
+                        st.info("💡 Pending transactions are automatically generated from your recurring expense schedules. Click the button to generate them manually.")
+                
+                    # Check if demo mode
+                    is_demo_mode = False
+                    if st.session_state.user:
+                        if hasattr(st.session_state.user, 'email'):
+                            is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
+                        else:
+                            is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
+                
+                    if is_demo_mode:
+                        st.info("🎯 Demo mode - Sign up to view recurring expenses!")
+                        return
+                
+                    st.info(f"Pending recurring expense transactions for: **{org_name}**")
+                
+                    # Date filter (default to current month)
+                    col1, col2 = st.columns([2, 1])
+                
+                    with col1:
+                        date_filter_type = st.selectbox(
+                            "Date Filter",
+                            ["Current Month", "All Time", "Custom Range", "Last 3 Months", "Last 6 Months", "Last Year"],
+                            key="recurring_expense_date_filter"
+                        )
+                
+                    with col2:
+                        if date_filter_type == "Custom Range":
+                            start_date = st.date_input("Start Date", value=date.today().replace(day=1), key="recurring_expense_start_date")
+                            end_date = st.date_input("End Date", value=date.today(), key="recurring_expense_end_date")
+                        else:
+                            start_date = None
+                            end_date = None
+                
+                    # Get pending expense transactions
+                    try:
+                        pending_expenses = db.client.table("pending_transactions").select("*").eq("organization_id", selected_org_id).eq("transaction_type", "expense").eq("is_confirmed", False).execute()
+                    
+                        if pending_expenses.data:
+                            # Apply date filter
+                            filtered_pending = []
+                            current_date = datetime.now()
+                        
+                            for pending in pending_expenses.data:
+                                pending_date = datetime.fromisoformat(pending['transaction_date'].replace('Z', '+00:00'))
+                            
+                                if date_filter_type == "Current Month":
+                                    if pending_date.year == current_date.year and pending_date.month == current_date.month:
+                                        filtered_pending.append(pending)
+                                elif date_filter_type == "This Year":
+                                    if pending_date.year == current_date.year:
+                                        filtered_pending.append(pending)
+                                elif date_filter_type == "Last 3 Months":
+                                    three_months_ago = current_date - timedelta(days=90)
+                                    if pending_date >= three_months_ago:
+                                        filtered_pending.append(pending)
+                                elif date_filter_type == "Last 6 Months":
+                                    six_months_ago = current_date - timedelta(days=180)
+                                    if pending_date >= six_months_ago:
+                                        filtered_pending.append(pending)
+                                elif date_filter_type == "Last Year":
+                                    one_year_ago = current_date - timedelta(days=365)
+                                    if pending_date >= one_year_ago:
+                                        filtered_pending.append(pending)
+                                elif date_filter_type == "Custom Range" and start_date and end_date:
+                                    if start_date <= pending_date.date() <= end_date:
+                                        filtered_pending.append(pending)
+                                elif date_filter_type == "All Time":
+                                    filtered_pending.append(pending)
+                        
+                            st.markdown(f"**Found {len(filtered_pending)} pending expense transactions**")
+                        
+                            # Display pending transactions
+                            for pending in filtered_pending:
+                                with st.container():
+                                    st.markdown("---")
                                 
-                                # Edit expense form
-                                if st.session_state.get(f"editing_expense_{exp.id}", False):
-                                    st.markdown("#### ✏️ Edit Expense Transaction")
+                                    # Transaction header
+                                    col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+                                
+                                    with col1:
+                                        # Get property name
+                                        try:
+                                            prop = db.client.table("properties").select("name").eq("id", pending['property_id']).execute()
+                                            prop_name = prop.data[0]['name'] if prop.data else "Unknown Property"
+                                        except:
+                                            prop_name = "Unknown Property"
                                     
-                                    with st.form(f"edit_expense_form_{exp.id}"):
-                                        edit_col1, edit_col2 = st.columns(2)
-                                        
-                                        with edit_col1:
-                                            edit_property_id = st.selectbox(
-                                                "Property",
-                                                options=[prop.id for prop in org_properties],
-                                                format_func=lambda x: property_names[x],
-                                                index=[prop.id for prop in org_properties].index(exp.property_id) if exp.property_id in [prop.id for prop in org_properties] else 0,
-                                                key=f"edit_expense_property_{exp.id}"
-                                            )
-                                            edit_amount = st.number_input("Amount", value=float(exp.amount), key=f"edit_expense_amount_{exp.id}")
-                                            edit_type = st.selectbox("Expense Type", [et.value for et in ExpenseType], 
-                                                                   index=[et.value for et in ExpenseType].index(exp.expense_type.value),
-                                                                   key=f"edit_expense_type_{exp.id}")
-                                        
-                                        with edit_col2:
-                                            edit_description = st.text_input("Description", value=exp.description, key=f"edit_expense_desc_{exp.id}")
-                                            edit_date = st.date_input("Transaction Date", value=exp.transaction_date.date(), key=f"edit_expense_date_{exp.id}")
-                                        
-                                        edit_form_col1, edit_form_col2 = st.columns(2)
-                                        
-                                        with edit_form_col1:
-                                            if st.form_submit_button("💾 Save Changes", type="primary"):
+                                        st.markdown(f"### 💸 {pending['expense_type'].title()}")
+                                        st.markdown(f"**Property:** {prop_name}")
+                                        st.markdown(f"**Description:** {pending['description']}")
+                                
+                                    with col2:
+                                        st.markdown("**Amount**")
+                                        st.markdown(f"${pending['amount']:,.2f}")
+                                
+                                    with col3:
+                                        st.markdown("**Date**")
+                                        pending_date = datetime.fromisoformat(pending['transaction_date'].replace('Z', '+00:00'))
+                                        st.markdown(pending_date.strftime('%Y-%m-%d'))
+                                
+                                    with col4:
+                                        st.markdown("**Actions**")
+                                        st.markdown('<div class="pending-actions">', unsafe_allow_html=True)
+                                        action_col1, action_col2, action_col3 = st.columns([1,1,1])
+                                    
+                                        with action_col1:
+                                            if st.button("✏️ Edit", key=f"edit_pending_expense_{pending['id']}"):
+                                                st.session_state[f"editing_pending_expense_{pending['id']}"] = True
+                                                st.rerun()
+                                    
+                                        with action_col2:
+                                            if st.button("🗑️ Delete", key=f"delete_pending_expense_{pending['id']}", type="secondary"):
+                                                st.session_state[f"confirm_delete_pending_expense_{pending['id']}"] = True
+                                                st.rerun()
+                                    
+                                        with action_col3:
+                                            if st.button("✅ Confirm", key=f"confirm_pending_expense_{pending['id']}", type="primary"):
+                                                st.session_state[f"confirm_move_pending_expense_{pending['id']}"] = True
+                                                st.rerun()
+                                        st.markdown('</div>', unsafe_allow_html=True)
+                                
+                                    # Confirmation dialog for deletion
+                                    if st.session_state.get(f"confirm_delete_pending_expense_{pending['id']}", False):
+                                        st.warning("⚠️ Are you sure you want to delete this pending transaction?")
+                                    
+                                        confirm_col1, confirm_col2 = st.columns(2)
+                                    
+                                        with confirm_col1:
+                                            if st.button("✅ Yes, Delete", key=f"confirm_yes_pending_expense_{pending['id']}", type="primary"):
                                                 try:
-                                                    # Update the expense record
-                                                    update_data = {
-                                                        "property_id": edit_property_id,
-                                                        "amount": edit_amount,
-                                                        "expense_type": edit_type,
-                                                        "description": edit_description,
-                                                        "transaction_date": edit_date.isoformat()
+                                                    # Delete the pending transaction
+                                                    db.client.table("pending_transactions").delete().eq("id", pending['id']).execute()
+                                                    st.success("Pending transaction deleted successfully!")
+                                                    if f"confirm_delete_pending_expense_{pending['id']}" in st.session_state:
+                                                        del st.session_state[f"confirm_delete_pending_expense_{pending['id']}"]
+                                                    st.rerun()
+                                                except Exception as e:
+                                                    st.error(f"Error deleting pending transaction: {str(e)}")
+                                    
+                                        with confirm_col2:
+                                            if st.button("❌ Cancel", key=f"confirm_no_pending_expense_{pending['id']}"):
+                                                if f"confirm_delete_pending_expense_{pending['id']}" in st.session_state:
+                                                    del st.session_state[f"confirm_delete_pending_expense_{pending['id']}"]
+                                                st.rerun()
+                                
+                                    # Confirmation dialog for moving to regular transactions
+                                    if st.session_state.get(f"confirm_move_pending_expense_{pending['id']}", False):
+                                        st.warning("⚠️ This will move this transaction to regular expense records. Continue?")
+                                    
+                                        confirm_col1, confirm_col2 = st.columns(2)
+                                    
+                                        with confirm_col1:
+                                            if st.button("✅ Yes, Move", key=f"confirm_yes_move_expense_{pending['id']}", type="primary"):
+                                                try:
+                                                    # Move to regular expense table
+                                                    # Include user_id to satisfy RLS insert policy
+                                                    current_user_id = None
+                                                    try:
+                                                        current_user_id = getattr(st.session_state.user, 'id', None)
+                                                    except Exception:
+                                                        try:
+                                                            current_user_id = st.session_state.user.get('id', None)
+                                                        except Exception:
+                                                            current_user_id = None
+                                                    expense_data = {
+                                                        "user_id": current_user_id,
+                                                        "organization_id": pending['organization_id'],
+                                                        "property_id": pending['property_id'],
+                                                        "amount": pending['amount'],
+                                                        "expense_type": pending['expense_type'],
+                                                        "description": pending['description'],
+                                                        "transaction_date": pending['transaction_date']
                                                     }
-                                                    
-                                                    result = db.client.table("expenses").update(update_data).eq("id", exp.id).execute()
+                                                
+                                                    # Insert into expense table
+                                                    result = db.client.table("expenses").insert(expense_data).execute()
                                                     if result.data:
-                                                        st.success("Expense transaction updated successfully!")
-                                                        # Clear the editing state
-                                                        if f"editing_expense_{exp.id}" in st.session_state:
-                                                            del st.session_state[f"editing_expense_{exp.id}"]
+                                                        # Delete from pending table
+                                                        db.client.table("pending_transactions").delete().eq("id", pending['id']).execute()
+                                                        st.success("Transaction confirmed and moved to regular expenses!")
+                                                        if f"confirm_move_pending_expense_{pending['id']}" in st.session_state:
+                                                            del st.session_state[f"confirm_move_pending_expense_{pending['id']}"]
                                                         st.rerun()
                                                     else:
-                                                        st.error("Failed to update expense transaction. Please try again.")
+                                                        st.error("Failed to move transaction. Please try again.")
                                                 except Exception as e:
-                                                    st.error(f"Error updating expense transaction: {str(e)}")
-                                        
-                                        with edit_form_col2:
-                                            if st.form_submit_button("❌ Cancel"):
-                                                # Clear the editing state
-                                                if f"editing_expense_{exp.id}" in st.session_state:
-                                                    del st.session_state[f"editing_expense_{exp.id}"]
+                                                    st.error(f"Error moving transaction: {str(e)}")
+                                    
+                                        with confirm_col2:
+                                            if st.button("❌ Cancel", key=f"confirm_no_move_expense_{pending['id']}"):
+                                                if f"confirm_move_pending_expense_{pending['id']}" in st.session_state:
+                                                    del st.session_state[f"confirm_move_pending_expense_{pending['id']}"]
                                                 st.rerun()
-                    
-                    else:
-                        st.info(f"No expense transactions found for {org_name}. Add your first expense transaction in the 'Add Expense' tab.")
-                    
-                except Exception as e:
-                    st.error(f"Error loading expense transactions: {str(e)}")
-        
+                                
+                                    # Edit form
+                                    if st.session_state.get(f"editing_pending_expense_{pending['id']}", False):
+                                        st.markdown("#### ✏️ Edit Pending Transaction")
+                                    
+                                        with st.form(f"edit_pending_expense_form_{pending['id']}"):
+                                            edit_col1, edit_col2 = st.columns(2)
+                                        
+                                            with edit_col1:
+                                                # Get properties for dropdown
+                                                org_properties = db.get_properties_by_organization(selected_org_id)
+                                                property_names = {prop.id: prop.name for prop in org_properties}
+                                            
+                                                edit_property_id = st.selectbox(
+                                                    "Property",
+                                                    options=[prop.id for prop in org_properties],
+                                                    format_func=lambda x: property_names[x],
+                                                    index=[prop.id for prop in org_properties].index(pending['property_id']) if pending['property_id'] in [prop.id for prop in org_properties] else 0,
+                                                    key=f"edit_pending_expense_property_{pending['id']}"
+                                                )
+                                                edit_amount = st.number_input("Amount", value=float(pending['amount']), key=f"edit_pending_expense_amount_{pending['id']}")
+                                                edit_type = st.selectbox("Expense Type", [et.value for et in ExpenseType], 
+                                                                       index=[et.value for et in ExpenseType].index(pending['expense_type']),
+                                                                       key=f"edit_pending_expense_type_{pending['id']}")
+                                        
+                                            with edit_col2:
+                                                edit_description = st.text_input("Description", value=pending['description'], key=f"edit_pending_expense_desc_{pending['id']}")
+                                                pending_date = datetime.fromisoformat(pending['transaction_date'].replace('Z', '+00:00'))
+                                                edit_date = st.date_input("Transaction Date", value=pending_date.date(), key=f"edit_pending_expense_date_{pending['id']}")
+                                        
+                                            edit_form_col1, edit_form_col2 = st.columns(2)
+                                        
+                                            with edit_form_col1:
+                                                if st.form_submit_button("💾 Save Changes", type="primary"):
+                                                    try:
+                                                        update_data = {
+                                                            "property_id": edit_property_id,
+                                                            "amount": edit_amount,
+                                                            "expense_type": edit_type,
+                                                            "description": edit_description,
+                                                            "transaction_date": edit_date.isoformat()
+                                                        }
+                                                    
+                                                        result = db.client.table("pending_transactions").update(update_data).eq("id", pending['id']).execute()
+                                                        if result.data:
+                                                            st.success("Pending transaction updated successfully!")
+                                                            if f"editing_pending_expense_{pending['id']}" in st.session_state:
+                                                                del st.session_state[f"editing_pending_expense_{pending['id']}"]
+                                                            st.rerun()
+                                                        else:
+                                                            st.error("Failed to update pending transaction. Please try again.")
+                                                    except Exception as e:
+                                                        st.error(f"Error updating pending transaction: {str(e)}")
+                                        
+                                            with edit_form_col2:
+                                                if st.form_submit_button("❌ Cancel"):
+                                                    if f"editing_pending_expense_{pending['id']}" in st.session_state:
+                                                        del st.session_state[f"editing_pending_expense_{pending['id']}"]
+                                                    st.rerun()
+                        
+                            # Summary
+                            total_pending = sum(pending['amount'] for pending in filtered_pending)
+                            st.metric("Total Pending Expenses", f"${total_pending:,.2f}")
+                        else:
+                            st.info("No pending recurring expense transactions found.")
+                        
+                    except Exception as e:
+                        st.error(f"Error loading pending transactions: {str(e)}")
+    
     elif selected == "Budget Planner":
         st.markdown('### 🧮 Budget Planner')
         
@@ -3237,121 +4161,179 @@ def show_main_app():
         org_properties = db.get_properties_by_organization(selected_org_id)
         
         # Budget Planner sub-menu
-        budget_tabs = st.tabs(["📊 Budget Overview", "➕ Create Budget", "📈 Budget Analysis", "⚙️ Manage Budgets"])
-        
-        with budget_tabs[0]:  # Budget Overview
-            st.subheader("Budget Overview")
-            
+        budget_tabs = st.tabs(["📈 Budget Analysis", "➕ Create Budget", "⚙️ Manage Budgets"])
+
+        with budget_tabs[0]:  # Budget Analysis
+            st.subheader("📊 Budget Analysis Dashboard")
+
             if org_properties:
-                # Filter controls
-                st.markdown("### 🔍 Filter Budgets")
-                
-                col1, col2, col3 = st.columns([2, 2, 2])
-                
-                with col1:
-                    # Property filter
-                    property_options = ["All Properties"] + [prop.name for prop in org_properties]
-                    selected_property_filter = st.selectbox(
-                        "Select Property",
-                        property_options,
-                        key="budget_overview_property_filter"
-                    )
-                
-                with col2:
-                    # Date range filter
-                    date_filter_type = st.selectbox(
-                        "Date Filter Type",
-                        ["All Time", "Custom Range", "This Year", "This Month"],
-                        key="budget_overview_date_filter_type"
-                    )
-                
-                with col3:
-                    # Custom date range (only show if Custom Range is selected)
-                    if date_filter_type == "Custom Range":
-                        start_date_filter = st.date_input(
-                            "Start Date",
-                            value=datetime.now().date() - timedelta(days=365),
-                            key="budget_overview_start_date"
-                        )
-                        end_date_filter = st.date_input(
-                            "End Date",
-                            value=datetime.now().date(),
-                            key="budget_overview_end_date"
-                        )
-                    else:
-                        start_date_filter = None
-                        end_date_filter = None
-                
-                # Get all budgets for the organization
-                all_budgets = db.get_budgets_by_organization(selected_org_id)
-                
-                if all_budgets:
-                    # Apply filters
-                    filtered_budgets = []
-                    
-                    for budget in all_budgets:
-                        # Property filter
-                        if selected_property_filter != "All Properties":
-                            if budget.property_id:
-                                property_name = next((p.name for p in org_properties if p.id == budget.property_id), "Unknown Property")
-                                if property_name != selected_property_filter:
-                                    continue
-                            else:
-                                continue  # Organization-wide budget doesn't match property filter
-                        elif budget.property_id is None and selected_property_filter != "All Properties":
-                            continue  # Organization-wide budget when specific property is selected
-                        
-                        # Date filter
-                        if date_filter_type == "All Time":
-                            pass  # Include all budgets
-                        elif date_filter_type == "This Year":
-                            current_year = datetime.now().year
-                            if budget.start_date.year != current_year:
-                                continue
-                        elif date_filter_type == "This Month":
-                            current_date = datetime.now()
-                            if budget.start_date.year != current_date.year or budget.start_date.month != current_date.month:
-                                continue
-                        elif date_filter_type == "Custom Range" and start_date_filter and end_date_filter:
-                            budget_start = budget.start_date.date()
-                            budget_end = budget.end_date.date()
-                            if not (budget_start <= end_date_filter and budget_end >= start_date_filter):
-                                continue
-                        
-                        filtered_budgets.append(budget)
-                    
-                    # Display filtered budgets
-                    if filtered_budgets:
-                        st.markdown(f"### 📋 Found {len(filtered_budgets)} Budget(s)")
-                        
-                        for budget in filtered_budgets:
-                            with st.expander(f"📋 {budget.name} - {budget.period.title()}", expanded=False):
-                                col1, col2, col3 = st.columns(3)
-                                
-                                with col1:
-                                    st.metric("Budget Amount", f"${budget.budget_amount:,.2f}")
-                                    st.write(f"**Scope:** {budget.scope.title()}")
-                                
-                                with col2:
-                                    st.write(f"**Period:** {budget.start_date.strftime('%Y-%m-%d')} to {budget.end_date.strftime('%Y-%m-%d')}")
-                                    st.write(f"**Status:** {'Active' if budget.is_active else 'Inactive'}")
-                                
-                                with col3:
-                                    if budget.property_id:
-                                        property_name = next((p.name for p in org_properties if p.id == budget.property_id), "Unknown Property")
-                                        st.write(f"**Property:** {property_name}")
+                # Get all budgets for analysis
+                budgets = db.get_budgets_by_organization(selected_org_id)
+
+                if budgets:
+                    # Budget selector and filters
+                    col1, col2, col3 = st.columns([2, 1, 1])
+
+                    with col1:
+                        budget_options = {f"{b.name} ({b.period.title()})": b for b in budgets}
+                        selected_budget_name = st.selectbox("Select Budget for Analysis", list(budget_options.keys()))
+
+                    with col2:
+                        analysis_period = st.selectbox("Analysis Period", ["Current Period", "Custom Range"], key="analysis_period")
+
+                    with col3:
+                        if analysis_period == "Custom Range":
+                            custom_start = st.date_input("Start Date", value=date.today(), key="custom_analysis_start")
+                            custom_end = st.date_input("End Date", value=date.today(), key="custom_analysis_end")
+                        else:
+                            custom_start = custom_end = None
+
+                    if selected_budget_name:
+                        selected_budget = budget_options[selected_budget_name]
+
+                        # Determine analysis date range
+                        if analysis_period == "Current Period":
+                            analysis_start = selected_budget.start_date
+                            analysis_end = selected_budget.end_date
+                        else:
+                            analysis_start = datetime.combine(custom_start, datetime.min.time())
+                            analysis_end = datetime.combine(custom_end, datetime.max.time())
+
+                        # Get budget analysis
+                        try:
+                            analysis = db.get_budget_analysis(selected_budget.id, analysis_start, analysis_end)
+                        except Exception as e:
+                            st.error(f"Error loading budget analysis: {str(e)}")
+                            analysis = None
+
+                        if analysis:
+                            # Key Metrics Dashboard
+                            st.markdown("### 📈 Key Metrics")
+                            col1, col2, col3, col4, col5 = st.columns(5)
+
+                            with col1:
+                                st.metric("Total Budgeted", f"${analysis['total_budgeted']:,.2f}",
+                                        delta=None, delta_color="normal")
+
+                            with col2:
+                                st.metric("Total Actual", f"${analysis['total_actual']:,.2f}",
+                                        delta=f"{analysis['variance_percentage']:+.1f}%",
+                                        delta_color="inverse" if analysis['is_over_budget'] else "normal")
+
+                            with col3:
+                                st.metric("Variance", f"${analysis['variance']:,.2f}",
+                                        delta=f"{analysis['variance_percentage']:+.1f}%",
+                                        delta_color="inverse" if analysis['is_over_budget'] else "normal")
+
+                            with col4:
+                                remaining_budget = analysis['total_budgeted'] - analysis['total_actual']
+                                st.metric("Remaining Budget", f"${remaining_budget:,.2f}",
+                                        delta=None, delta_color="normal")
+
+                            with col5:
+                                status = "Over Budget" if analysis['is_over_budget'] else "Under Budget"
+                                st.metric("Status", status, delta=None, delta_color="normal")
+
+
+                            # Budget Performance Summary with better layout
+                            st.markdown("### 📋 Budget Performance Summary")
+
+                            # Create two-column layout for better space utilization
+                            col1, col2 = st.columns([1, 1])
+
+                            with col1:
+                                st.markdown("#### 💰 Financial Overview")
+                                performance_data = {
+                                    'Metric': [
+                                        'Total Budget Allocated',
+                                        'Actual Spending to Date',
+                                        'Remaining Budget',
+                                        'Budget Utilization',
+                                        'Variance Amount',
+                                        'Budget Status'
+                                    ],
+                                    'Value': [
+                                        f"${analysis['total_budgeted']:,.2f}",
+                                        f"${analysis['total_actual']:,.2f}",
+                                        f"${analysis['total_budgeted'] - analysis['total_actual']:,.2f}",
+                                        f"{(analysis['total_actual'] / analysis['total_budgeted'] * 100):.1f}%" if analysis['total_budgeted'] > 0 else "0%",
+                                        f"${analysis['variance']:+,.2f}",
+                                        '⚠️ Over Budget' if analysis['is_over_budget'] else '✅ On Track'
+                                    ]
+                                }
+
+                                df_performance = pd.DataFrame(performance_data)
+                                st.dataframe(df_performance, use_container_width=True, hide_index=True)
+
+                            with col2:
+                                st.markdown("#### 📊 Quick Insights")
+
+                                # Calculate some quick insights
+                                utilization_percent = (analysis['total_actual'] / analysis['total_budgeted'] * 100) if analysis['total_budgeted'] > 0 else 0
+                                remaining_percent = 100 - utilization_percent
+
+                                # Progress bar for budget utilization
+                                st.markdown("**Budget Utilization Progress:**")
+                                st.progress(utilization_percent / 100)
+                                st.caption(f"{utilization_percent:.1f}% used, {remaining_percent:.1f}% remaining")
+
+                                # Status indicators - compact layout
+                                st.markdown("**Status Indicators:**")
+
+                                # Create a container to reduce spacing
+                                status_col1, status_col2 = st.columns(2)
+
+                                with status_col1:
+                                    if analysis['is_over_budget']:
+                                        st.error(f"⚠️ **Over Budget by ${abs(analysis['variance']):,.2f}**")
                                     else:
-                                        st.write("**Scope:** All Properties")
-                                    
-                                    # Quick analysis
-                                    analysis = db.get_budget_analysis(budget.id, budget.start_date, budget.end_date)
-                                    if analysis:
-                                        variance_color = "red" if analysis['is_over_budget'] else "green"
-                                        st.markdown(f"**Variance:** <span style='color: {variance_color}'>{analysis['variance_percentage']:.1f}%</span>", unsafe_allow_html=True)
-                    else:
-                        st.info("No budgets found matching the selected filters.")
+                                        st.success(f"✅ **Under Budget by ${abs(analysis['variance']):,.2f}**")
+
+                                    # Budget health
+                                    if utilization_percent < 50:
+                                        st.success("🟢 **Budget Health: Excellent**")
+                                    elif utilization_percent < 80:
+                                        st.warning("🟡 **Budget Health: Good**")
+                                    else:
+                                        st.error("🔴 **Budget Health: Needs Attention**")
+
+                                with status_col2:
+                                    # Spending rate
+                                    if analysis['total_actual'] > 0:
+                                        daily_average = analysis['total_actual'] / 30  # Assuming 30 days
+                                        st.info(f"📈 **Daily Average Spending: ${daily_average:,.2f}**")
+
+                            # Category Breakdown (if available)
+                            if analysis['actual_by_category']:
+                                st.markdown("### 🏷️ Spending by Category")
+
+                                category_data = []
+                                for category, amount in analysis['actual_by_category'].items():
+                                    category_data.append({
+                                        'Category': category.title(),
+                                        'Amount': f"${amount:,.2f}",
+                                        'Percentage': f"{(amount / analysis['total_actual'] * 100):.1f}%" if analysis['total_actual'] > 0 else "0%"
+                                    })
+
+                                if category_data:
+                                    df_categories = pd.DataFrame(category_data)
+                                    st.dataframe(df_categories, use_container_width=True, hide_index=True)
+
+                                    # Category pie chart
+                                    fig_pie = go.Figure(data=[go.Pie(
+                                        labels=[item['Category'] for item in category_data],
+                                        values=[float(item['Amount'].replace('$', '').replace(',', '')) for item in category_data],
+                                        hole=0.3
+                                    )])
+
+                                    fig_pie.update_layout(
+                                        title="Spending Distribution by Category",
+                                        height=400
+                                    )
+
+                                    st.plotly_chart(fig_pie, use_container_width=True)
                 else:
-                    st.info("No budgets created yet. Create your first budget in the 'Create Budget' tab.")
+                    st.info("No budgets available for analysis. Create a budget first.")
             else:
                 st.info(f"No properties found for {org_name}. Please add a property first.")
         
@@ -3472,177 +4454,8 @@ def show_main_app():
                             st.error("Please fill in all required fields.")
             else:
                 st.info(f"No properties found for {org_name}. Please add a property first.")
-        
-        with budget_tabs[2]:  # Budget Analysis
-            st.subheader("📊 Budget Analysis Dashboard")
-            
-            if org_properties:
-                # Get all budgets for analysis
-                budgets = db.get_budgets_by_organization(selected_org_id)
-                
-                if budgets:
-                    # Budget selector and filters
-                    col1, col2, col3 = st.columns([2, 1, 1])
-                    
-                    with col1:
-                        budget_options = {f"{b.name} ({b.period.title()})": b for b in budgets}
-                        selected_budget_name = st.selectbox("Select Budget for Analysis", list(budget_options.keys()))
-                    
-                    with col2:
-                        analysis_period = st.selectbox("Analysis Period", ["Current Period", "Custom Range"], key="analysis_period")
-                    
-                    with col3:
-                        if analysis_period == "Custom Range":
-                            custom_start = st.date_input("Start Date", value=date.today(), key="custom_analysis_start")
-                            custom_end = st.date_input("End Date", value=date.today(), key="custom_analysis_end")
-                        else:
-                            custom_start = custom_end = None
-                    
-                    if selected_budget_name:
-                        selected_budget = budget_options[selected_budget_name]
-                        
-                        # Determine analysis date range
-                        if analysis_period == "Current Period":
-                            analysis_start = selected_budget.start_date
-                            analysis_end = selected_budget.end_date
-                        else:
-                            analysis_start = datetime.combine(custom_start, datetime.min.time())
-                            analysis_end = datetime.combine(custom_end, datetime.max.time())
-                        
-                        # Get budget analysis
-                        try:
-                            analysis = db.get_budget_analysis(selected_budget.id, analysis_start, analysis_end)
-                        except Exception as e:
-                            st.error(f"Error loading budget analysis: {str(e)}")
-                            analysis = None
-                        
-                        if analysis:
-                            # Key Metrics Dashboard
-                            st.markdown("### 📈 Key Metrics")
-                            col1, col2, col3, col4, col5 = st.columns(5)
-                            
-                            with col1:
-                                st.metric("Total Budgeted", f"${analysis['total_budgeted']:,.2f}", 
-                                        delta=None, delta_color="normal")
-                            
-                            with col2:
-                                st.metric("Total Actual", f"${analysis['total_actual']:,.2f}", 
-                                        delta=f"{analysis['variance_percentage']:+.1f}%", 
-                                        delta_color="inverse" if analysis['is_over_budget'] else "normal")
-                            
-                            with col3:
-                                st.metric("Variance", f"${analysis['variance']:,.2f}", 
-                                        delta=f"{analysis['variance_percentage']:+.1f}%", 
-                                        delta_color="inverse" if analysis['is_over_budget'] else "normal")
-                            
-                            with col4:
-                                remaining_budget = analysis['total_budgeted'] - analysis['total_actual']
-                                st.metric("Remaining Budget", f"${remaining_budget:,.2f}", 
-                                        delta=None, delta_color="normal")
-                            
-                            with col5:
-                                status = "Over Budget" if analysis['is_over_budget'] else "Under Budget"
-                                st.metric("Status", status, delta=None, delta_color="normal")
-                            
-                            
-                            # Budget Performance Summary with better layout
-                            st.markdown("### 📋 Budget Performance Summary")
-                            
-                            # Create two-column layout for better space utilization
-                            col1, col2 = st.columns([1, 1])
-                            
-                            with col1:
-                                st.markdown("#### 💰 Financial Overview")
-                                performance_data = {
-                                    'Metric': [
-                                        'Total Budget Allocated',
-                                        'Actual Spending to Date',
-                                        'Remaining Budget',
-                                        'Budget Utilization',
-                                        'Variance Amount',
-                                        'Budget Status'
-                                    ],
-                                    'Value': [
-                                        f"${analysis['total_budgeted']:,.2f}",
-                                        f"${analysis['total_actual']:,.2f}",
-                                        f"${analysis['total_budgeted'] - analysis['total_actual']:,.2f}",
-                                        f"{(analysis['total_actual'] / analysis['total_budgeted'] * 100):.1f}%" if analysis['total_budgeted'] > 0 else "0%",
-                                        f"${analysis['variance']:+,.2f}",
-                                        '⚠️ Over Budget' if analysis['is_over_budget'] else '✅ On Track'
-                                    ]
-                                }
-                                
-                                df_performance = pd.DataFrame(performance_data)
-                                st.dataframe(df_performance, use_container_width=True, hide_index=True)
-                            
-                            with col2:
-                                st.markdown("#### 📊 Quick Insights")
-                                
-                                # Calculate some quick insights
-                                utilization_percent = (analysis['total_actual'] / analysis['total_budgeted'] * 100) if analysis['total_budgeted'] > 0 else 0
-                                remaining_percent = 100 - utilization_percent
-                                
-                                # Progress bar for budget utilization
-                                st.markdown("**Budget Utilization Progress:**")
-                                st.progress(utilization_percent / 100)
-                                st.caption(f"{utilization_percent:.1f}% used, {remaining_percent:.1f}% remaining")
-                                
-                                # Status indicators
-                                st.markdown("**Status Indicators:**")
-                                
-                                if analysis['is_over_budget']:
-                                    st.error(f"⚠️ **Over Budget by ${abs(analysis['variance']):,.2f}**")
-                                else:
-                                    st.success(f"✅ **Under Budget by ${abs(analysis['variance']):,.2f}**")
-                                
-                                # Spending rate
-                                if analysis['total_actual'] > 0:
-                                    daily_average = analysis['total_actual'] / 30  # Assuming 30 days
-                                    st.info(f"📈 **Daily Average Spending: ${daily_average:,.2f}**")
-                                
-                                # Budget health
-                                if utilization_percent < 50:
-                                    st.success("🟢 **Budget Health: Excellent**")
-                                elif utilization_percent < 80:
-                                    st.warning("🟡 **Budget Health: Good**")
-                                else:
-                                    st.error("🔴 **Budget Health: Needs Attention**")
-                            
-                            # Category Breakdown (if available)
-                            if analysis['actual_by_category']:
-                                st.markdown("### 🏷️ Spending by Category")
-                                
-                                category_data = []
-                                for category, amount in analysis['actual_by_category'].items():
-                                    category_data.append({
-                                        'Category': category.title(),
-                                        'Amount': f"${amount:,.2f}",
-                                        'Percentage': f"{(amount / analysis['total_actual'] * 100):.1f}%" if analysis['total_actual'] > 0 else "0%"
-                                    })
-                                
-                                if category_data:
-                                    df_categories = pd.DataFrame(category_data)
-                                    st.dataframe(df_categories, use_container_width=True, hide_index=True)
-                                    
-                                    # Category pie chart
-                                    fig_pie = go.Figure(data=[go.Pie(
-                                        labels=[item['Category'] for item in category_data],
-                                        values=[float(item['Amount'].replace('$', '').replace(',', '')) for item in category_data],
-                                        hole=0.3
-                                    )])
-                                    
-                                    fig_pie.update_layout(
-                                        title="Spending Distribution by Category",
-                                        height=400
-                                    )
-                                    
-                                    st.plotly_chart(fig_pie, use_container_width=True)
-                else:
-                    st.info("No budgets available for analysis. Create a budget first.")
-            else:
-                st.info(f"No properties found for {org_name}. Please add a property first.")
-        
-        with budget_tabs[3]:  # Manage Budgets
+
+        with budget_tabs[2]:  # Manage Budgets
             st.subheader("Manage Budgets")
             
             if org_properties:
@@ -4041,8 +4854,8 @@ def show_main_app():
         except Exception as e:
             st.error(f"Analytics error: {str(e)}")
     
-    elif selected == "Rent Reminders":
-        st.markdown('<h1 class="main-header">🔔 Rent Reminders</h1>', unsafe_allow_html=True)
+    elif selected == "Reminders":
+        st.markdown('<h1 class="main-header">🔔 Reminders</h1>', unsafe_allow_html=True)
         
         # Check if demo mode
         is_demo_mode = False
@@ -4056,8 +4869,8 @@ def show_main_app():
             # Demo mode - show sample rent reminder data
             st.markdown('<div class="info-box">🎯 <strong>Demo Mode</strong> - Showing sample rent reminder data. Sign up to manage your own reminders!</div>', unsafe_allow_html=True)
             
-            # Demo rent reminders
-            st.markdown("### Sample Rent Reminders")
+            # Demo reminders
+            st.markdown("### Sample Reminders")
             
             demo_reminders = [
                 {
@@ -4155,9 +4968,9 @@ def show_main_app():
             test_result = reminder_service.db.supabase.table("rent_reminders").select("id").limit(1).execute()
         except Exception as e:
             if "Could not find the table" in str(e):
-                st.error("❌ **Rent Reminders table not found in database!**")
+                st.error("❌ **Reminders table not found in database!**")
                 st.markdown("""
-                **To set up the Rent Reminders feature, you need to:**
+                **To set up the Reminders feature, you need to:**
                 
                 1. **Go to your Supabase Dashboard**
                 2. **Navigate to SQL Editor**
@@ -4181,7 +4994,7 @@ def show_main_app():
         org = db.get_organization_by_id(selected_org_id)
         org_name = org.name if org else "Unknown Organization"
         
-        st.info(f"Rent Reminders for: **{org_name}**")
+        st.info(f"Reminders for: **{org_name}**")
         
         # Create monthly reminders button
         col1, col2, col3 = st.columns([2, 1, 1])
@@ -4777,16 +5590,23 @@ def show_main_app():
                             # Explicitly drop any id column if present
                             if 'id' in df.columns:
                                 df = df.drop(columns=['id'])
-                            
-                            # Add Total row
-                            total_amount = df['Amount'].sum()
+
+                            # Calculate totals: Income (positive) and Expenses (negative)
+                            total_income = df[df['Type'] == 'Income']['Amount'].sum()
+                            total_expenses = df[df['Type'] == 'Expense']['Amount'].sum()
+                            final_total = total_income - total_expenses
+
+                            # Convert S.No. to string to allow empty string in total row
+                            df['S.No.'] = df['S.No.'].astype(str)
+
+                            # Add Total row with net calculation
                             total_row = pd.DataFrame({
                                 'S.No.': [''],
                                 'Date': [''],
                                 'Type': [''],
                                 'Property': [''],
-                                'Description': ['**TOTAL**'],
-                                'Amount': [total_amount]
+                                'Description': [f'**TOTAL (Income: ${total_income:,.2f} - Expenses: ${total_expenses:,.2f})**'],
+                                'Amount': [final_total]
                             })
                             df_with_total = pd.concat([df, total_row], ignore_index=True)
                             
@@ -5095,6 +5915,105 @@ def show_main_app():
     elif selected == "AI Insights":
         st.markdown('<h1 class="main-header">🤖 AI-Powered Insights</h1>', unsafe_allow_html=True)
         st.info("AI insights functionality - Sign up to use with your own data!")
+
+def generate_pending_transactions_for_organization(organization_id: int):
+    """Generate pending transactions for a specific organization"""
+    from datetime import datetime, timedelta, date
+    from database.models import RecurringTransaction, PendingTransaction, RecurringInterval
+    
+    db = DatabaseOperations()
+    current_date = date.today()
+    
+    # Get all active recurring transactions for this organization
+    recurring_transactions = db.get_recurring_transactions_by_organization(organization_id)
+    
+    generated_count = 0
+    
+    for recurring in recurring_transactions:
+        # Check if we should generate a pending transaction
+        if not recurring.is_active:
+            continue
+            
+        # Check if we've passed the end date
+        if recurring.end_date and current_date > recurring.end_date.date():
+            continue
+        
+        # Calculate the latest due date on or before today
+        start_date = recurring.start_date.date()
+        next_due_date = start_date
+        if current_date > start_date:
+            if recurring.interval == RecurringInterval.WEEKLY:
+                weeks = (current_date - start_date).days // 7
+                next_due_date = start_date + timedelta(weeks=weeks)
+            elif recurring.interval == RecurringInterval.MONTHLY:
+                years = current_date.year - start_date.year
+                months = years * 12 + (current_date.month - start_date.month)
+                months = max(0, months)
+                y = start_date.year + (start_date.month - 1 + months) // 12
+                m = (start_date.month - 1 + months) % 12 + 1
+                dim = [31,29 if (y%4==0 and (y%100!=0 or y%400==0)) else 28,31,30,31,30,31,31,30,31,30,31][m-1]
+                d = min(start_date.day, dim)
+                next_due_date = date(y, m, d)
+            elif recurring.interval == RecurringInterval.QUARTERLY:
+                years = current_date.year - start_date.year
+                months = years * 12 + (current_date.month - start_date.month)
+                quarters = max(0, months // 3)
+                y = start_date.year + (start_date.month - 1 + quarters*3) // 12
+                m = (start_date.month - 1 + quarters*3) % 12 + 1
+                dim = [31,29 if (y%4==0 and (y%100!=0 or y%400==0)) else 28,31,30,31,30,31,31,30,31,30,31][m-1]
+                d = min(start_date.day, dim)
+                next_due_date = date(y, m, d)
+            elif recurring.interval == RecurringInterval.YEARLY:
+                y = current_date.year
+                m = start_date.month
+                dim = [31,29 if (y%4==0 and (y%100!=0 or y%400==0)) else 28,31,30,31,30,31,31,30,31,30,31][m-1]
+                d = min(start_date.day, dim)
+                next_due_date = date(y, m, d)
+        
+        # If next due date is today or in the past, generate pending transaction
+        if next_due_date <= current_date:
+            # Check if pending transaction already exists
+            existing_pending = db.get_pending_transactions_by_organization(organization_id)
+            already_pending = any(
+                pt.recurring_transaction_id == recurring.id and
+                pt.transaction_date.date() == next_due_date
+                for pt in existing_pending
+            )
+
+            # Also check if this transaction was already confirmed and exists in regular income/expense tables
+            already_confirmed = False
+            try:
+                if recurring.transaction_type == 'income':
+                    # Check income table for same property, amount, and date
+                    income_check = db.client.table("income").select("id").eq("organization_id", organization_id).eq("property_id", recurring.property_id).eq("amount", recurring.amount).eq("transaction_date", datetime.combine(next_due_date, datetime.min.time()).isoformat()).execute()
+                    already_confirmed = len(income_check.data) > 0
+                elif recurring.transaction_type == 'expense':
+                    # Check expense table for same property, amount, and date
+                    expense_check = db.client.table("expenses").select("id").eq("organization_id", organization_id).eq("property_id", recurring.property_id).eq("amount", recurring.amount).eq("transaction_date", datetime.combine(next_due_date, datetime.min.time()).isoformat()).execute()
+                    already_confirmed = len(expense_check.data) > 0
+            except Exception:
+                # If check fails, assume not confirmed
+                already_confirmed = False
+
+            if not already_pending and not already_confirmed:
+                # Create pending transaction
+                pending_transaction = PendingTransaction(
+                    organization_id=recurring.organization_id,
+                    property_id=recurring.property_id,
+                    transaction_type=recurring.transaction_type,
+                    income_type=recurring.income_type,
+                    expense_type=recurring.expense_type,
+                    amount=recurring.amount,
+                    description=recurring.description,
+                    transaction_date=datetime.combine(next_due_date, datetime.min.time()),
+                    recurring_transaction_id=recurring.id,
+                    is_confirmed=False
+                )
+
+                if db.create_pending_transaction(pending_transaction):
+                    generated_count += 1
+    
+    return generated_count
 
 def main():
     """Main application function"""
