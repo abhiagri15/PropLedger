@@ -2605,8 +2605,6 @@ def show_main_app():
         
             with tab2:
                 if org_properties:
-                    st.subheader("Add New Income Record")
-                
                     # Use a key to reset form after successful submission
                     income_form_key = f"add_income_form_{st.session_state.get('income_form_reset_counter', 0)}"
                 
@@ -2675,8 +2673,6 @@ def show_main_app():
                     st.info(f"No properties found for {org_name}. Please add a property first.")
     
                 with tab3:  # Manage Income - Recurring Income Setup
-                    st.markdown('<h3 class="main-header">🔄 Recurring Income Setup</h3>', unsafe_allow_html=True)
-                
                     # Check if demo mode
                     is_demo_mode = False
                     if st.session_state.user:
@@ -2688,17 +2684,14 @@ def show_main_app():
                     if is_demo_mode:
                         st.info("🎯 Demo mode - Sign up to set up recurring income!")
                         return
-                
-                    st.info(f"Set up recurring income for: **{org_name}**")
-                
+
                     # Get properties for the organization
                     try:
                         org_properties = db.get_properties_by_organization(selected_org_id)
                     
                         if org_properties:
                             st.markdown("---")
-                            st.markdown("#### ➕ Add New Recurring Income")
-                        
+
                             with st.form("recurring_income_form"):
                                 col1, col2 = st.columns(2)
                             
@@ -2786,10 +2779,9 @@ def show_main_app():
                                             st.error(f"Error creating recurring income: {str(e)}")
                                     else:
                                         st.error("Please fill in all required fields.")
-                        
+
                             st.markdown("---")
-                            st.markdown("#### 📋 Existing Recurring Income")
-                        
+
                             # Display existing recurring income
                             try:
                                 recurring_income = db.client.table("recurring_transactions").select("*").eq("organization_id", selected_org_id).eq("transaction_type", "income").eq("is_active", True).execute()
@@ -2920,8 +2912,6 @@ def show_main_app():
                         st.error(f"Error loading properties: {str(e)}")
             
                 with tab4:  # Recurring Income - Pending Transactions
-                    st.markdown('<h3 class="main-header">🔄 Recurring Income - Pending Transactions</h3>', unsafe_allow_html=True)
-                
                     # Generate pending transactions button
                     col1, col2 = st.columns([1, 4])
                     with col1:
@@ -2948,9 +2938,7 @@ def show_main_app():
                     if is_demo_mode:
                         st.info("🎯 Demo mode - Sign up to view recurring income!")
                         return
-                
-                    st.info(f"Pending recurring income transactions for: **{org_name}**")
-                
+
                     # Date filter (default to current month)
                     col1, col2 = st.columns([2, 1])
                 
@@ -3462,8 +3450,6 @@ def show_main_app():
         
             with tab2:
                 if org_properties:
-                    st.subheader("Add New Expense Record")
-                
                     # Use a key to reset form after successful submission
                     expense_form_key = f"add_expense_form_{st.session_state.get('expense_form_reset_counter', 0)}"
                 
@@ -3532,8 +3518,6 @@ def show_main_app():
                     st.info(f"No properties found for {org_name}. Please add a property first.")
             
                 with tab3:  # Manage Expenses - Recurring Expense Setup
-                    st.markdown('<h3 class="main-header">🔄 Recurring Expense Setup</h3>', unsafe_allow_html=True)
-                
                     # Check if demo mode
                     is_demo_mode = False
                     if st.session_state.user:
@@ -3545,17 +3529,14 @@ def show_main_app():
                     if is_demo_mode:
                         st.info("🎯 Demo mode - Sign up to set up recurring expenses!")
                         return
-                
-                    st.info(f"Set up recurring expenses for: **{org_name}**")
-                
+
                     # Get properties for the organization
                     try:
                         org_properties = db.get_properties_by_organization(selected_org_id)
                     
                         if org_properties:
                             st.markdown("---")
-                            st.markdown("#### ➕ Add New Recurring Expense")
-                        
+
                             with st.form("recurring_expense_form"):
                                 col1, col2 = st.columns(2)
                             
@@ -3643,10 +3624,9 @@ def show_main_app():
                                             st.error(f"Error creating recurring expense: {str(e)}")
                                     else:
                                         st.error("Please fill in all required fields.")
-                        
+
                             st.markdown("---")
-                            st.markdown("#### 📋 Existing Recurring Expenses")
-                        
+
                             # Display existing recurring expenses
                             try:
                                 recurring_expenses = db.client.table("recurring_transactions").select("*").eq("organization_id", selected_org_id).eq("transaction_type", "expense").eq("is_active", True).execute()
@@ -3777,8 +3757,6 @@ def show_main_app():
                         st.error(f"Error loading properties: {str(e)}")
             
                 with tab4:  # Recurring Expenses - Pending Transactions
-                    st.markdown('<h3 class="main-header">🔄 Recurring Expenses - Pending Transactions</h3>', unsafe_allow_html=True)
-                
                     # Generate pending transactions button
                     col1, col2 = st.columns([1, 4])
                     with col1:
@@ -3805,9 +3783,7 @@ def show_main_app():
                     if is_demo_mode:
                         st.info("🎯 Demo mode - Sign up to view recurring expenses!")
                         return
-                
-                    st.info(f"Pending recurring expense transactions for: **{org_name}**")
-                
+
                     # Date filter (default to current month)
                     col1, col2 = st.columns([2, 1])
                 
