@@ -26,6 +26,8 @@ class ExpenseType(str, Enum):
     MANAGEMENT = "management"
     ADVERTISING = "advertising"
     LEGAL = "legal"
+    HOA = "hoa"
+    HOME_WARRANTY = "home_warranty"
     OTHER = "other"
 
 class OrganizationRole(str, Enum):
