@@ -2281,7 +2281,6 @@ def show_main_app():
                                         if st.form_submit_button("💾 Save Changes", type="primary"):
                                             try:
                                                 # Create updated property object
-                                                from database.models import Property, PropertyType
                                                 updated_property = Property(
                                                     id=prop.id,
                                                     organization_id=prop.organization_id,
