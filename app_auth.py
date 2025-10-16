@@ -1008,32 +1008,67 @@ def initialize_session_state():
     if 'user' not in st.session_state:
         st.session_state.user = None
     if 'auth_mode' not in st.session_state:
-        st.session_state.auth_mode = 'login'  # 'login' or 'signup'
+        st.session_state.auth_mode = 'signin'  # 'signin' or 'signup'
 
 def show_auth_page():
     """Display authentication page"""
-    st.markdown('<h1 class="main-header">🏠 PropLedger</h1>', unsafe_allow_html=True)
-    st.markdown('<div style="text-align: center; margin-bottom: 2rem;">Rental Property Management System</div>', unsafe_allow_html=True)
-    
-    # Create two columns for login/signup
-    col1, col2 = st.columns([1, 1])
-    
-    with col1:
-        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-        st.markdown("### 🔐 Sign In")
-        
-        # Use a key to reset form after successful submission
-        login_form_key = f"login_form_{st.session_state.get('login_form_reset_counter', 0)}"
-        
-        # Create a container for the form
-        login_container = st.container()
-        
-        with login_container:
+
+    # Initialize auth mode in session state
+    if 'auth_mode' not in st.session_state:
+        st.session_state.auth_mode = 'signin'  # 'signin' or 'signup'
+
+    # Create a centered layout with narrower form
+    left_spacer, main_col, right_spacer = st.columns([2, 1, 2])
+
+    with main_col:
+        # App branding
+        st.markdown("""
+            <div style="text-align: center; padding: 2rem 0 1rem 0;">
+                <h1 style="color: #1f77b4; font-size: 2.2rem; margin-bottom: 0.3rem; font-weight: 700;">
+                    🏠 PropLedger
+                </h1>
+                <p style="color: #888; font-size: 0.95rem; margin: 0;">
+                    Rental Property Management System
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Tab-like buttons for switching between Sign In and Sign Up
+        col_signin, col_signup = st.columns(2)
+        with col_signin:
+            if st.button("Sign In", use_container_width=True, type="primary" if st.session_state.auth_mode == 'signin' else "secondary"):
+                st.session_state.auth_mode = 'signin'
+                st.rerun()
+        with col_signup:
+            if st.button("Sign Up", use_container_width=True, type="primary" if st.session_state.auth_mode == 'signup' else "secondary"):
+                st.session_state.auth_mode = 'signup'
+                st.rerun()
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # SIGN IN FORM
+        if st.session_state.auth_mode == 'signin':
+            st.markdown("""
+                <div style="text-align: center; padding-bottom: 1.5rem;">
+                    <h2 style="color: #333; font-size: 1.6rem; margin: 0; font-weight: 600;">
+                        Welcome back
+                    </h2>
+                    <p style="color: #666; font-size: 0.95rem; margin-top: 0.3rem;">
+                        Sign in to continue managing your portfolio
+                    </p>
+                </div>
+            """, unsafe_allow_html=True)
+
+            # Use a key to reset form after successful submission
+            login_form_key = f"login_form_{st.session_state.get('login_form_reset_counter', 0)}"
+
             with st.form(login_form_key):
-                email = st.text_input("Email", key=f"login_email_{st.session_state.get('login_form_reset_counter', 0)}", placeholder="your@email.com")
+                email = st.text_input("Email Address", key=f"login_email_{st.session_state.get('login_form_reset_counter', 0)}", placeholder="name@example.com")
                 password = st.text_input("Password", type="password", key=f"login_password_{st.session_state.get('login_form_reset_counter', 0)}", placeholder="Enter your password")
-                login_submitted = st.form_submit_button("Sign In", type="primary", use_container_width=True)
-            
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                login_submitted = st.form_submit_button("Sign in to your account", type="primary", use_container_width=True)
+
             if login_submitted:
                 if email and password:
                     try:
@@ -1042,12 +1077,11 @@ def show_auth_page():
                             "email": email,
                             "password": password
                         })
-                        
+
                         if response.user:
                             st.session_state.authenticated = True
                             st.session_state.user = response.user
                             st.success("✅ Successfully signed in!")
-                            # Clear the form by incrementing reset counter
                             st.session_state.login_form_reset_counter = st.session_state.get('login_form_reset_counter', 0) + 1
                             st.rerun()
                         else:
@@ -1056,27 +1090,32 @@ def show_auth_page():
                         st.error(f"❌ Login failed: {str(e)}")
                 else:
                     st.error("❌ Please fill in all fields")
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-        st.markdown("### 📝 Sign Up")
-        
-        # Use a key to reset form after successful submission
-        signup_form_key = f"signup_form_{st.session_state.get('signup_form_reset_counter', 0)}"
-        
-        # Create a container for the form
-        signup_container = st.container()
-        
-        with signup_container:
+
+        # SIGN UP FORM
+        else:
+            st.markdown("""
+                <div style="text-align: center; padding-bottom: 1.5rem;">
+                    <h2 style="color: #333; font-size: 1.6rem; margin: 0; font-weight: 600;">
+                        Create your account
+                    </h2>
+                    <p style="color: #666; font-size: 0.95rem; margin-top: 0.3rem;">
+                        Get started with PropLedger today
+                    </p>
+                </div>
+            """, unsafe_allow_html=True)
+
+            # Use a key to reset form after successful submission
+            signup_form_key = f"signup_form_{st.session_state.get('signup_form_reset_counter', 0)}"
+
             with st.form(signup_form_key):
-                signup_email = st.text_input("Email", key=f"signup_email_{st.session_state.get('signup_form_reset_counter', 0)}", placeholder="your@email.com")
-                signup_password = st.text_input("Password", type="password", key=f"signup_password_{st.session_state.get('signup_form_reset_counter', 0)}", placeholder="Create a password")
+                signup_email = st.text_input("Email Address", key=f"signup_email_{st.session_state.get('signup_form_reset_counter', 0)}", placeholder="name@example.com")
+                signup_password = st.text_input("Password", type="password", key=f"signup_password_{st.session_state.get('signup_form_reset_counter', 0)}", placeholder="Create a password (min 6 characters)")
                 confirm_password = st.text_input("Confirm Password", type="password", key=f"confirm_password_{st.session_state.get('signup_form_reset_counter', 0)}", placeholder="Confirm your password")
                 signup_organization = st.text_input("Organization Name", key=f"signup_organization_{st.session_state.get('signup_form_reset_counter', 0)}", placeholder="Your company/organization name")
-                signup_submitted = st.form_submit_button("Sign Up", type="primary", use_container_width=True)
-            
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                signup_submitted = st.form_submit_button("Create free account", type="primary", use_container_width=True)
+
             if signup_submitted:
                 if signup_email and signup_password and confirm_password and signup_organization:
                     if signup_password != confirm_password:
@@ -1090,7 +1129,7 @@ def show_auth_page():
                                 "email": signup_email,
                                 "password": signup_password
                             })
-                            
+
                             if response.user:
                                 # Create organization for the new user
                                 try:
@@ -1099,17 +1138,17 @@ def show_auth_page():
                                         "name": signup_organization,
                                         "description": f"Organization created by {signup_email}"
                                     }).execute()
-                                    
+
                                     if org_response.data:
                                         org_id = org_response.data[0]["id"]
-                                        
+
                                         # Add user to organization as owner
                                         user_org_response = supabase.table("user_organizations").insert({
                                             "user_id": response.user.id,
                                             "organization_id": org_id,
                                             "role": "owner"
                                         }).execute()
-                                        
+
                                         if user_org_response.data:
                                             # Set the created organization as selected
                                             st.session_state.selected_organization = org_id
@@ -1124,7 +1163,7 @@ def show_auth_page():
                                 except Exception as org_error:
                                     st.success("✅ Account created successfully! Please check your email to verify your account.")
                                     st.warning(f"⚠️ Organization creation failed: {str(org_error)}")
-                                
+
                                 # Clear the form by incrementing reset counter (only once at the end)
                                 st.session_state.signup_form_reset_counter = st.session_state.get('signup_form_reset_counter', 0) + 1
                                 st.rerun()
@@ -1134,19 +1173,25 @@ def show_auth_page():
                             st.error(f"❌ Sign up failed: {str(e)}")
                 else:
                     st.error("❌ Please fill in all fields")
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-    
-    # Demo access
-    st.markdown("---")
-    st.markdown('<div class="info-box">', unsafe_allow_html=True)
-    st.markdown("### 🎯 Want to try without signing up?")
-    st.markdown("Click the button below to access the demo version with sample data.")
-    if st.button("🚀 Try Demo Version", use_container_width=True):
-        st.session_state.authenticated = True
-        st.session_state.user = {"email": "demo@example.com", "user_metadata": {"full_name": "Demo User"}}
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
+
+        # Demo access section
+        st.markdown("<br><hr><br>", unsafe_allow_html=True)
+
+        st.markdown("""
+            <div style="text-align: center; padding: 1rem 0;">
+                <h3 style="color: #333; font-size: 1.2rem; margin-bottom: 0.5rem;">
+                    🎯 Want to try without signing up?
+                </h3>
+                <p style="color: #666; font-size: 0.9rem; margin-bottom: 1.5rem;">
+                    Explore all features with our interactive demo
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        if st.button("🚀 Try Demo Version", type="secondary", use_container_width=True):
+            st.session_state.authenticated = True
+            st.session_state.user = {"email": "demo@example.com", "user_metadata": {"full_name": "Demo User"}}
+            st.rerun()
 
 def show_main_app():
     """Display the main application"""
