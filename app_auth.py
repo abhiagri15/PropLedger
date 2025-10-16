@@ -2369,30 +2369,34 @@ def show_main_app():
     elif selected == "Accounting":
         # Accounting sub-menu
         accounting_tabs = st.tabs(["💰 Income", "💸 Expenses"])
-        
+
+        # Check if demo mode first
+        is_demo_mode = False
+        if st.session_state.user:
+            if hasattr(st.session_state.user, 'email'):
+                is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
+            else:
+                is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
+
         # Get selected organization (shared by both Income and Expenses)
         selected_org_id = st.session_state.get('selected_organization')
-        if not selected_org_id:
+        if not selected_org_id and not is_demo_mode:
             st.error("Please select an organization first.")
             return
-        
-        # Get organization name
-        org = db.get_organization_by_id(selected_org_id)
-        org_name = org.name if org else "Unknown Organization"
-        
-        # Get properties for this organization (used in both tabs)
-        properties = db.get_properties()
-        org_properties = [p for p in properties if p.organization_id == selected_org_id]
+
+        # Get organization name and properties
+        if is_demo_mode:
+            org_name = "Demo Organization"
+            org_properties = []  # Demo mode will use sample data
+        else:
+            org = db.get_organization_by_id(selected_org_id)
+            org_name = org.name if org else "Unknown Organization"
+
+            # Get properties for this organization (used in both tabs)
+            properties = db.get_properties()
+            org_properties = [p for p in properties if p.organization_id == selected_org_id]
         
         with accounting_tabs[0]:  # Income
-            # Check if demo mode
-            is_demo_mode = False
-            if st.session_state.user:
-                if hasattr(st.session_state.user, 'email'):
-                    is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
-                else:
-                    is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
-        
             if is_demo_mode:
                 # Demo mode - show sample income data
                 st.info("🎯 **Demo Mode** - Showing sample income data. Sign up to manage your own income!")
@@ -2507,12 +2511,43 @@ def show_main_app():
                             income_records = filtered_income_records
                     
                         if income_records:
-                            # Calculate total income
+                            # Calculate total income and breakdown by type
                             total_income = sum(inc.amount for inc in income_records)
 
-                            # Display total and count
-                            st.markdown(f"### 💰 Total Income: ${total_income:,.2f}")
-                            st.markdown(f"**Found {len(income_records)} income transactions**")
+                            # Calculate breakdown by income type
+                            income_breakdown = {}
+                            for inc in income_records:
+                                income_type = inc.income_type.value.title().replace("_", " ")
+                                if income_type in income_breakdown:
+                                    income_breakdown[income_type] += inc.amount
+                                else:
+                                    income_breakdown[income_type] = inc.amount
+
+                            # Display total and breakdown side by side
+                            header_col1, header_col2 = st.columns([1, 2])
+
+                            with header_col1:
+                                st.markdown(f"### 💰 Total Income: ${total_income:,.2f}")
+                                st.markdown(f"**Found {len(income_records)} income transactions**")
+
+                            with header_col2:
+                                # Sort breakdown: Rent first, then others alphabetically
+                                sorted_breakdown = []
+                                if "Rent" in income_breakdown:
+                                    sorted_breakdown.append(("Rent", income_breakdown["Rent"]))
+                                # Add other categories alphabetically
+                                for type_name in sorted(income_breakdown.keys()):
+                                    if type_name != "Rent":
+                                        sorted_breakdown.append((type_name, income_breakdown[type_name]))
+
+                                # Display breakdown in columns
+                                num_categories = len(sorted_breakdown)
+                                breakdown_cols = st.columns(num_categories)
+                                for idx, (type_name, amount) in enumerate(sorted_breakdown):
+                                    with breakdown_cols[idx]:
+                                        st.markdown(f"💰 {type_name}")
+                                        st.markdown(f"${amount:,.2f}")
+
                             st.markdown("---")
 
                             # Display income transactions with edit/delete buttons
@@ -2636,10 +2671,6 @@ def show_main_app():
                                                     if f"editing_income_{inc.id}" in st.session_state:
                                                         del st.session_state[f"editing_income_{inc.id}"]
                                                     st.rerun()
-
-                            # Income summary
-                            total_income = sum(inc.amount for inc in income_records)
-                            st.metric("Total Income", f"${total_income:,.2f}")
                         else:
                             st.info("No income records found.")
                 else:
@@ -3230,14 +3261,6 @@ def show_main_app():
                         st.error(f"Error loading pending transactions: {str(e)}")
         
         with accounting_tabs[1]:  # Expenses
-            # Check if demo mode
-            is_demo_mode = False
-            if st.session_state.user:
-                if hasattr(st.session_state.user, 'email'):
-                    is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
-                else:
-                    is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
-        
             if is_demo_mode:
                 # Demo mode - show sample expense data
                 st.info("🎯 **Demo Mode** - Showing sample expense data. Sign up to manage your own expenses!")
@@ -3352,12 +3375,43 @@ def show_main_app():
                         expense_records = filtered_expense_records
 
                     if expense_records:
-                        # Calculate total expenses
+                        # Calculate total expenses and breakdown by type
                         total_expenses = sum(exp.amount for exp in expense_records)
 
-                        # Display total and count
-                        st.markdown(f"### 💸 Total Expenses: ${total_expenses:,.2f}")
-                        st.markdown(f"**Found {len(expense_records)} expense transactions**")
+                        # Calculate breakdown by expense type
+                        expense_breakdown = {}
+                        for exp in expense_records:
+                            expense_type = exp.expense_type.value.title().replace("_", " ")
+                            if expense_type in expense_breakdown:
+                                expense_breakdown[expense_type] += exp.amount
+                            else:
+                                expense_breakdown[expense_type] = exp.amount
+
+                        # Display total and breakdown side by side
+                        header_col1, header_col2 = st.columns([1, 2])
+
+                        with header_col1:
+                            st.markdown(f"### 💸 Total Expenses: ${total_expenses:,.2f}")
+                            st.markdown(f"**Found {len(expense_records)} expense transactions**")
+
+                        with header_col2:
+                            # Sort breakdown: Mortgage first, then others alphabetically
+                            sorted_breakdown = []
+                            if "Mortgage" in expense_breakdown:
+                                sorted_breakdown.append(("Mortgage", expense_breakdown["Mortgage"]))
+                            # Add other categories alphabetically
+                            for type_name in sorted(expense_breakdown.keys()):
+                                if type_name != "Mortgage":
+                                    sorted_breakdown.append((type_name, expense_breakdown[type_name]))
+
+                            # Display breakdown in columns
+                            num_categories = len(sorted_breakdown)
+                            breakdown_cols = st.columns(num_categories)
+                            for idx, (type_name, amount) in enumerate(sorted_breakdown):
+                                with breakdown_cols[idx]:
+                                    st.markdown(f"💸 {type_name}")
+                                    st.markdown(f"${amount:,.2f}")
+
                         st.markdown("---")
 
                         # Display expense transactions with edit/delete buttons
@@ -3481,10 +3535,6 @@ def show_main_app():
                                                     if f"editing_expense_{exp.id}" in st.session_state:
                                                         del st.session_state[f"editing_expense_{exp.id}"]
                                                     st.rerun()
-                    
-                        # Expense summary
-                        total_expenses = sum(exp.amount for exp in expense_records)
-                        st.metric("Total Expenses", f"${total_expenses:,.2f}")
                     else:
                         st.info("No expense records found.")
                 else:
@@ -5183,9 +5233,17 @@ def show_main_app():
                 st.error(f"Error fetching historical reminders: {str(e)}")
 
     elif selected == "Reports":
+        # Check if demo mode first
+        is_demo_mode = False
+        if st.session_state.user:
+            if hasattr(st.session_state.user, 'email'):
+                is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
+            else:
+                is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
+
         # Get selected organization for all reports
         selected_org_id = st.session_state.get('selected_organization')
-        if not selected_org_id:
+        if not selected_org_id and not is_demo_mode:
             st.error("Please select an organization first.")
             return
 
@@ -5193,17 +5251,6 @@ def show_main_app():
         report_tabs = st.tabs(["📊 P&L", "📑 Transactions", "🏠 Properties Performance"])
 
         with report_tabs[0]:
-            # Check if demo mode
-            is_demo_mode = False
-            if st.session_state.user:
-                if hasattr(st.session_state.user, 'email'):
-                    user_email = st.session_state.user.email
-                else:
-                    user_email = st.session_state.user.get('email', 'Unknown')
-                
-                if user_email == 'demo@example.com':
-                    is_demo_mode = True
-            
             if is_demo_mode:
                 st.info("🎯 **Demo Mode** - Showing sample reports with sample data")
                 
@@ -5509,14 +5556,6 @@ def show_main_app():
                             st.error(f"Error generating P&L report: {str(e)}")
 
         with report_tabs[1]:
-            # Check if demo mode
-            is_demo_mode = False
-            if st.session_state.user:
-                if hasattr(st.session_state.user, 'email'):
-                    is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
-                else:
-                    is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
-
             if is_demo_mode:
                 st.info("🎯 **Demo Mode** - Showing sample transaction data. Sign up to view your actual transactions!")
 
@@ -5773,12 +5812,6 @@ def show_main_app():
                         st.error(f"Error generating Transactions report: {str(e)}")
         
         with report_tabs[2]:
-            # Check if demo mode
-            is_demo_mode = False
-            if st.session_state.user:
-                if hasattr(st.session_state.user, 'email'):
-                    is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
-
             if is_demo_mode:
                 st.info("🎯 **Demo Mode** - Showing sample property performance data.")
 
