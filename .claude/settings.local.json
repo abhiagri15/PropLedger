@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git rm:*)",
+      "Bash(find:*)",
+      "Bash(\"C:\\Program Files\\Microsoft SDKs\\Azure\\CLI2\\python.exe\" -c \"\n# Read the file\nwith open(''app_auth.py'', ''r'', encoding=''utf-8'') as f:\n    lines = f.readlines()\n\n# Fix indentation for lines 4824-5045 (indices 4823-5044)\n# These lines should be indented 16 spaces (4 levels)\nfixed_lines = []\nfor i, line in enumerate(lines):\n    line_num = i + 1\n    \n    # Lines that need to be indented (inside the try block)\n    if 4824 <= line_num <= 5045:\n        # Only add indentation if the line is not empty and doesn''t already have enough indentation\n        if line.strip():  # Not an empty line\n            # Count current indentation\n            current_indent = len(line) - len(line.lstrip())\n            # We need 16 spaces total (4 levels)\n            if current_indent < 16:\n                # Add 4 more spaces\n                fixed_lines.append(''    '' + line)\n            else:\n                fixed_lines.append(line)\n        else:\n            fixed_lines.append(line)\n    else:\n        fixed_lines.append(line)\n\n# Write back\nwith open(''app_auth.py'', ''w'', encoding=''utf-8'') as f:\n    f.writelines(fixed_lines)\n\nprint(''Fixed indentation for lines 4824-5045'')\n\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
