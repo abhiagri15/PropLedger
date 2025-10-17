@@ -83,7 +83,7 @@ def render_accounting():
         org_properties = [p for p in properties if p.organization_id == selected_org_id]
 
         # Tabs for income management - matching reference design
-        tab1, tab2, tab3, tab4 = st.tabs(["View/Edit Income", "Add Income", "Manage Income", "Recurring Income"])
+        tab1, tab2, tab3, tab4 = st.tabs(["View Transactions", "Add Income", "Manage Transactions", "Recurring Income"])
 
         with tab1:
 
@@ -128,7 +128,25 @@ def render_accounting():
                 if income_records:
                     st.info(f"Found {len(income_records)} income transactions")
 
-                    # Display income records
+                    # All summary metrics in one line - 4 columns
+                    col1, col2, col3, col4 = st.columns(4)
+
+                    # Calculate totals
+                    total_income = sum(inc.amount for inc in income_records)
+                    rent_total = sum(inc.amount for inc in income_records if inc.income_type.lower() == 'rent')
+                    parking_total = sum(inc.amount for inc in income_records if inc.income_type.lower() == 'parking')
+                    late_fee_total = sum(inc.amount for inc in income_records if inc.income_type.lower() in ['late_fee', 'latefee'])
+
+                    with col1:
+                        st.metric("🔥 Total Income", f"${total_income:,.2f}")
+                    with col2:
+                        st.metric("🔥 Rent", f"${rent_total:,.2f}")
+                    with col3:
+                        st.metric("🔥 Parking", f"${parking_total:,.2f}")
+                    with col4:
+                        st.metric("🔥 Late Fee", f"${late_fee_total:,.2f}")
+
+                    # Display income records in dataframe
                     income_data = []
                     for inc in income_records:
                         prop_name = property_names.get(inc.property_id, "Unknown")
@@ -144,10 +162,6 @@ def render_accounting():
                     # Reset index to start from 1 instead of 0
                     df_income.index = range(1, len(df_income) + 1)
                     st.dataframe(df_income, use_container_width=True)
-
-                    # Income summary
-                    total_income = sum(inc.amount for inc in income_records)
-                    st.metric("Total Income", f"${total_income:,.2f}")
                 else:
                     st.info("No income records found.")
             else:
@@ -229,8 +243,8 @@ def render_accounting():
             st.subheader("Manage Income Records")
 
             if org_properties:
-                # Filter options
-                col1, col2 = st.columns(2)
+                # Filter options with Apply button
+                col1, col2, col3 = st.columns([2, 2, 1])
                 with col1:
                     filter_property = st.selectbox("Filter by Property",
                                                   ["All"] + [p.name for p in org_properties],
@@ -239,9 +253,35 @@ def render_accounting():
                     filter_date = st.selectbox("Date Filter",
                                               ["Current Month", "Last 3 Months", "Last 6 Months", "This Year", "All Time"],
                                               key="manage_income_date")
+                with col3:
+                    st.markdown("<br>", unsafe_allow_html=True)  # Add spacing to align button
+                    apply_filter = st.button("Apply Filter", key="manage_income_apply_filter", type="primary")
 
                 # Get income records
                 income_records = db.get_all_income()
+
+                # Filter by property
+                if filter_property != "All":
+                    income_records = [inc for inc in income_records
+                                    if any(p.name == filter_property and p.id == inc.property_id for p in org_properties)]
+
+                # Apply date filter
+                if income_records and filter_date != "All Time":
+                    from datetime import datetime, timedelta
+                    today = datetime.now().date()  # Convert to date for comparison
+
+                    if filter_date == "Current Month":
+                        start_date = today.replace(day=1)
+                    elif filter_date == "Last 3 Months":
+                        start_date = today - timedelta(days=90)
+                    elif filter_date == "Last 6 Months":
+                        start_date = today - timedelta(days=180)
+                    elif filter_date == "This Year":
+                        start_date = today.replace(month=1, day=1)
+
+                    # Convert transaction_date to date if it's a datetime object
+                    income_records = [inc for inc in income_records
+                                     if (inc.transaction_date.date() if hasattr(inc.transaction_date, 'date') else inc.transaction_date) >= start_date]
 
                 if income_records:
                     st.info(f"Found {len(income_records)} income records")
@@ -309,7 +349,7 @@ def render_accounting():
 
                 # Check if recurring_transactions table exists and has data
                 try:
-                    recurring_result = db.client.table("recurring_transactions").select("*").eq("organization_id", selected_org_id).execute()
+                    recurring_result = db.client.table("recurring_transactions").select("*").eq("organization_id", selected_org_id).eq("transaction_type", "income").execute()
 
                     if recurring_result.data:
                         for rec in recurring_result.data:
@@ -396,7 +436,7 @@ def render_accounting():
         org_properties = [p for p in properties if p.organization_id == selected_org_id]
 
         # Tabs for expense management - matching reference design with 4 tabs
-        exp_tab1, exp_tab2, exp_tab3, exp_tab4 = st.tabs(["View/Edit Expenses", "Add Expense", "Manage Expenses", "Recurring Expense"])
+        exp_tab1, exp_tab2, exp_tab3, exp_tab4 = st.tabs(["View Transactions", "Add Expense", "Manage Transactions", "Recurring Expense"])
 
         with exp_tab1:
 
@@ -441,19 +481,22 @@ def render_accounting():
                 if expense_records:
                     st.info(f"Found {len(expense_records)} expense transactions")
 
-                    # Category summary metrics in 3 columns
-                    col1, col2, col3 = st.columns(3)
+                    # All summary metrics in one line - 4 columns
+                    col1, col2, col3, col4 = st.columns(4)
 
-                    # Calculate category totals
+                    # Calculate totals
+                    total_expenses = sum(exp.amount for exp in expense_records)
                     mortgage_total = sum(exp.amount for exp in expense_records if exp.expense_type.lower() == 'mortgage')
                     hoa_total = sum(exp.amount for exp in expense_records if exp.expense_type.lower() == 'hoa')
                     repairs_total = sum(exp.amount for exp in expense_records if exp.expense_type.lower() in ['maintenance', 'repairs'])
 
                     with col1:
-                        st.metric("💸 Mortgage", f"${mortgage_total:,.2f}")
+                        st.metric("💸 Total Expenses", f"${total_expenses:,.2f}")
                     with col2:
-                        st.metric("💸 Hoa", f"${hoa_total:,.2f}")
+                        st.metric("💸 Mortgage", f"${mortgage_total:,.2f}")
                     with col3:
+                        st.metric("💸 Hoa", f"${hoa_total:,.2f}")
+                    with col4:
                         st.metric("💸 Repairs", f"${repairs_total:,.2f}")
 
                     # Display expense records in table
@@ -472,10 +515,6 @@ def render_accounting():
                     # Reset index to start from 1 instead of 0
                     df_expense.index = range(1, len(df_expense) + 1)
                     st.dataframe(df_expense, use_container_width=True)
-
-                    # Total Expenses summary
-                    total_expenses = sum(exp.amount for exp in expense_records)
-                    st.markdown(f"### 💸 Total Expenses: ${total_expenses:,.2f}")
                 else:
                     st.info("No expense records found.")
             else:
@@ -557,8 +596,8 @@ def render_accounting():
             st.subheader("Manage Expense Records")
 
             if org_properties:
-                # Filter options
-                col1, col2 = st.columns(2)
+                # Filter options with Apply button
+                col1, col2, col3 = st.columns([2, 2, 1])
                 with col1:
                     filter_property = st.selectbox("Filter by Property",
                                                   ["All"] + [p.name for p in org_properties],
@@ -567,9 +606,35 @@ def render_accounting():
                     filter_date = st.selectbox("Date Filter",
                                               ["Current Month", "Last 3 Months", "Last 6 Months", "This Year", "All Time"],
                                               key="manage_expense_date")
+                with col3:
+                    st.markdown("<br>", unsafe_allow_html=True)  # Add spacing to align button
+                    apply_filter = st.button("Apply Filter", key="manage_expense_apply_filter", type="primary")
 
                 # Get expense records
                 expense_records = db.get_all_expenses()
+
+                # Filter by property
+                if filter_property != "All":
+                    expense_records = [exp for exp in expense_records
+                                    if any(p.name == filter_property and p.id == exp.property_id for p in org_properties)]
+
+                # Apply date filter
+                if expense_records and filter_date != "All Time":
+                    from datetime import datetime, timedelta
+                    today = datetime.now().date()  # Convert to date for comparison
+
+                    if filter_date == "Current Month":
+                        start_date = today.replace(day=1)
+                    elif filter_date == "Last 3 Months":
+                        start_date = today - timedelta(days=90)
+                    elif filter_date == "Last 6 Months":
+                        start_date = today - timedelta(days=180)
+                    elif filter_date == "This Year":
+                        start_date = today.replace(month=1, day=1)
+
+                    # Convert transaction_date to date if it's a datetime object
+                    expense_records = [exp for exp in expense_records
+                                     if (exp.transaction_date.date() if hasattr(exp.transaction_date, 'date') else exp.transaction_date) >= start_date]
 
                 if expense_records:
                     st.info(f"Found {len(expense_records)} expense records")
