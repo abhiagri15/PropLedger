@@ -34,7 +34,7 @@ st.set_page_config(
     page_title="PropLedger - Rental Property Management",
     page_icon="🏠",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # Set default navigation state
@@ -67,6 +67,7 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         background-color: #f9f9f9;
     }
+
     .success-box {
         background-color: #d4edda;
         border: 1px solid #c3e6cb;
@@ -168,9 +169,189 @@ window.addEventListener('load', function() {
 
 def show_auth_page():
     """Display authentication page"""
+
+    # Initialize auth mode in session state
+    if 'auth_mode' not in st.session_state:
+        st.session_state.auth_mode = 'signin'  # 'signin' or 'signup'
+
+    # Create a centered layout with narrower form
+    left_spacer, main_col, right_spacer = st.columns([2, 1, 2])
+
+    with main_col:
+        # App branding
+        st.markdown("""
+            <div style="text-align: center; padding: 1rem 0 0.5rem 0;">
+                <h1 style="color: #1f77b4; font-size: 1.8rem; margin-bottom: 0.2rem; font-weight: 700;">
+                    🏠 PropLedger
+                </h1>
+                <p style="color: #888; font-size: 0.85rem; margin: 0;">
+                    Rental Property Management System
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Tab-like buttons for switching between Sign In and Sign Up
+        col_signin, col_signup = st.columns(2)
+        with col_signin:
+            if st.button("Sign In", use_container_width=True, key="signin_button", type="primary" if st.session_state.auth_mode == 'signin' else "secondary"):
+                st.session_state.auth_mode = 'signin'
+                st.rerun()
+        with col_signup:
+            if st.button("Sign Up", use_container_width=True, key="signup_button", type="primary" if st.session_state.auth_mode == 'signup' else "secondary"):
+                st.session_state.auth_mode = 'signup'
+                st.rerun()
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # SIGN IN FORM
+        if st.session_state.auth_mode == 'signin':
+            st.markdown("""
+                <div style="text-align: center; padding-bottom: 0.8rem;">
+                    <h2 style="color: #333; font-size: 1.3rem; margin: 0; font-weight: 600;">
+                        Welcome back
+                    </h2>
+                    <p style="color: #666; font-size: 0.85rem; margin-top: 0.2rem;">
+                        Sign in to continue managing your portfolio
+                    </p>
+                </div>
+            """, unsafe_allow_html=True)
+
+            # Use a key to reset form after successful submission
+            login_form_key = f"login_form_{st.session_state.get('login_form_reset_counter', 0)}"
+
+            with st.form(login_form_key):
+                email = st.text_input("Email Address", key=f"login_email_{st.session_state.get('login_form_reset_counter', 0)}", placeholder="name@example.com")
+                password = st.text_input("Password", type="password", key=f"login_password_{st.session_state.get('login_form_reset_counter', 0)}", placeholder="Enter your password")
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                login_submitted = st.form_submit_button("Sign in to your account", type="primary", use_container_width=True)
+
+            if login_submitted:
+                if email and password:
+                    try:
+                        supabase = get_supabase_client()
+                        response = supabase.auth.sign_in_with_password({
+                            "email": email,
+                            "password": password
+                        })
+
+                        if response.user:
+                            st.session_state.authenticated = True
+                            st.session_state.user = response.user
+                            st.success("✅ Successfully signed in!")
+                            st.session_state.login_form_reset_counter = st.session_state.get('login_form_reset_counter', 0) + 1
+                            st.rerun()
+                        else:
+                            st.error("❌ Invalid email or password")
+                    except Exception as e:
+                        st.error(f"❌ Login failed: {str(e)}")
+                else:
+                    st.error("❌ Please fill in all fields")
+
+        # SIGN UP FORM
+        else:
+            st.markdown("""
+                <div style="text-align: center; padding-bottom: 0.8rem;">
+                    <h2 style="color: #333; font-size: 1.3rem; margin: 0; font-weight: 600;">
+                        Create your account
+                    </h2>
+                    <p style="color: #666; font-size: 0.85rem; margin-top: 0.2rem;">
+                        Get started with PropLedger today
+                    </p>
+                </div>
+            """, unsafe_allow_html=True)
+
+            # Use a key to reset form after successful submission
+            signup_form_key = f"signup_form_{st.session_state.get('signup_form_reset_counter', 0)}"
+
+            with st.form(signup_form_key):
+                signup_email = st.text_input("Email Address", key=f"signup_email_{st.session_state.get('signup_form_reset_counter', 0)}", placeholder="name@example.com")
+                signup_password = st.text_input("Password", type="password", key=f"signup_password_{st.session_state.get('signup_form_reset_counter', 0)}", placeholder="Create a password (min 6 characters)")
+                confirm_password = st.text_input("Confirm Password", type="password", key=f"confirm_password_{st.session_state.get('signup_form_reset_counter', 0)}", placeholder="Confirm your password")
+                signup_organization = st.text_input("Organization Name", key=f"signup_organization_{st.session_state.get('signup_form_reset_counter', 0)}", placeholder="Your company/organization name")
+
+                st.markdown("<br>", unsafe_allow_html=True)
+                signup_submitted = st.form_submit_button("Create free account", type="primary", use_container_width=True)
+
+            if signup_submitted:
+                if signup_email and signup_password and confirm_password and signup_organization:
+                    if signup_password != confirm_password:
+                        st.error("❌ Passwords do not match")
+                    elif len(signup_password) < 6:
+                        st.error("❌ Password must be at least 6 characters")
+                    else:
+                        try:
+                            supabase = get_supabase_client()
+                            response = supabase.auth.sign_up({
+                                "email": signup_email,
+                                "password": signup_password
+                            })
+
+                            if response.user:
+                                # Create organization for the new user
+                                try:
+                                    # First create the organization
+                                    org_response = supabase.table("organizations").insert({
+                                        "name": signup_organization,
+                                        "description": f"Organization created by {signup_email}"
+                                    }).execute()
+
+                                    if org_response.data:
+                                        org_id = org_response.data[0]["id"]
+
+                                        # Add user to organization as owner
+                                        user_org_response = supabase.table("user_organizations").insert({
+                                            "user_id": response.user.id,
+                                            "organization_id": org_id,
+                                            "role": "owner"
+                                        }).execute()
+
+                                        if user_org_response.data:
+                                            st.session_state.selected_organization = org_id
+                                            st.success("✅ Account and organization created successfully! Please check your email to verify your account.")
+                                            st.info("📧 A verification email has been sent to your email address.")
+                                        else:
+                                            st.success("✅ Account created successfully! Please check your email to verify your account.")
+                                            st.warning("⚠️ Organization creation failed, but you can create one later.")
+                                    else:
+                                        st.success("✅ Account created successfully! Please check your email to verify your account.")
+                                        st.warning("⚠️ Organization creation failed, but you can create one later.")
+                                except Exception as org_error:
+                                    st.success("✅ Account created successfully! Please check your email to verify your account.")
+                                    st.warning(f"⚠️ Organization creation failed: {str(org_error)}")
+
+                                st.session_state.signup_form_reset_counter = st.session_state.get('signup_form_reset_counter', 0) + 1
+                                st.rerun()
+                            else:
+                                st.error("❌ Failed to create account. Email might already be in use.")
+                        except Exception as e:
+                            st.error(f"❌ Sign up failed: {str(e)}")
+                else:
+                    st.error("❌ Please fill in all fields")
+
+        # Demo access section
+        st.markdown("<hr style='margin: 1rem 0;'>", unsafe_allow_html=True)
+        st.markdown("""
+            <div style="text-align: center; padding: 0.5rem 0;">
+                <p style="color: #666; font-size: 0.85rem;">
+                    🎯 <strong>Want to try without signing up?</strong>
+                </p>
+                <p style="color: #888; font-size: 0.75rem; margin-top: 0.2rem;">
+                    Explore all features with our interactive demo
+                </p>
+            </div>
+        """, unsafe_allow_html=True)
+        if st.button("🚀 Try Demo Version", use_container_width=True):
+            st.session_state.authenticated = True
+            st.session_state.user = {"email": "demo@example.com", "user_metadata": {"full_name": "Demo User"}}
+            st.rerun()
+
+
+def show_auth_page_old():
+    """Display authentication page - OLD VERSION"""
     st.markdown('<h1 class="main-header">🏠 PropLedger</h1>', unsafe_allow_html=True)
     st.markdown('<div style="text-align: center; margin-bottom: 2rem;">Rental Property Management System</div>', unsafe_allow_html=True)
-    
+
     # Create two columns for login/signup
     col1, col2 = st.columns([1, 1])
     
@@ -324,13 +505,43 @@ def show_main_app():
     # Sidebar navigation
     with st.sidebar:
         st.markdown("# 🏠 PropLedger")
-        
-        # User info - Compact
+
+        st.markdown("---")
+
+        # Navigation - Most important section at top
+        # Force Dashboard selection on first load
+        if st.session_state.get('force_dashboard', False):
+            st.session_state.force_dashboard = False
+            # Force rerun to ensure Dashboard is selected
+            st.rerun()
+
+        # Ensure Dashboard is always selected on first load
+        if 'main_navigation' not in st.session_state:
+            st.session_state.main_navigation = "Dashboard"
+
+        selected = option_menu(
+            menu_title=None,  # Remove Navigation header
+            options=["My Org", "Dashboard", "Properties", "Accounting", "Analytics", "Rent Reminders", "Reports", "📊 Budgets", "🏗️ CapEx", "👥 Vendors", "AI Insights"],
+            icons=["building", "speedometer2", "house", "wallet2", "graph-up", "bell", "file-earmark-text", "calculator", "tools", "people", "robot"],
+            menu_icon="cast",
+            default_index=1,  # Dashboard is default
+            key="main_navigation",
+            styles={
+                "container": {"padding": "0!important", "background-color": "#f8f9fa"},
+                "icon": {"color": "#6c757d", "font-size": "20px"},
+                "nav-link": {"font-size": "14px", "text-align": "left", "margin":"0px", "--hover-color": "#e9ecef", "color": "#495057"},
+                "nav-link-selected": {"background-color": "#d4edda", "color": "#155724"},
+            }
+        )
+
+        st.markdown("---")
+
+        # User info and organization at bottom
         if SessionManager.get_user():
             # Get user info using session manager
             user_email = SessionManager.get_user_email() or 'Unknown'
             user_id = SessionManager.get_user_id()
-            
+
             # Get user name from metadata
             user = SessionManager.get_user()
             if user:
@@ -343,9 +554,7 @@ def show_main_app():
                     user_name = user_email
             else:
                 user_name = user_email
-            
-            st.markdown(f"**{user_name}**")
-            
+
             # Organization selection - Compact
             if user_id:
                 db = DatabaseOperations()
@@ -354,7 +563,7 @@ def show_main_app():
                     org_names = [org.name for org in organizations]
                     if 'selected_organization' not in st.session_state:
                         st.session_state.selected_organization = organizations[0].id
-                    
+
                     # Find the index of the selected organization
                     selected_index = 0
                     if st.session_state.selected_organization:
@@ -364,68 +573,39 @@ def show_main_app():
                         except (StopIteration, ValueError):
                             # If selected organization not found, default to first one
                             selected_index = 0
-                    
+
                     selected_org_name = st.selectbox(
                         "Organization",
                         options=org_names,
-                        index=selected_index
+                        index=selected_index,
+                        label_visibility="collapsed"
                     )
-                    
+
                     # Update selected organization
                     for org in organizations:
                         if org.name == selected_org_name:
                             st.session_state.selected_organization = org.id
                             break
                 else:
-                    st.warning("No organizations found")
+                    st.info("No organizations")
                     # Clear selected organization if user has no organizations
                     if 'selected_organization' in st.session_state:
                         del st.session_state.selected_organization
-        
-        # Authentication status - Compact
-        if SessionManager.get_user():
+
+            # User info at bottom
+            st.markdown(f"👤 {user_name}")
+
+            # Authentication status - Compact
             if SessionManager.is_demo_mode():
-                st.markdown('🎯 **DEMO MODE**')
-            else:
-                st.markdown('✅ **AUTHENTICATED**')
-        
-        st.markdown("---")
-        
-        # Navigation - Most important section
-        # Force Dashboard selection on first load
-        if st.session_state.get('force_dashboard', False):
-            st.session_state.force_dashboard = False
-            # Force rerun to ensure Dashboard is selected
-            st.rerun()
-        
-        # Ensure Dashboard is always selected on first load
-        if 'main_navigation' not in st.session_state:
-            st.session_state.main_navigation = "Dashboard"
-        
-        selected = option_menu(
-            menu_title="📋 Navigation",
-            options=["Organizations Dashboard", "Dashboard", "Properties", "Income", "Expenses", "Analytics", "Rent Reminders", "Reports", "📊 Budgets", "🏗️ CapEx", "👥 Vendors", "AI Insights"],
-            icons=["building", "speedometer2", "house", "cash-coin", "receipt", "graph-up", "bell", "file-earmark-text", "calculator", "tools", "people", "robot"],
-            menu_icon="cast",
-            default_index=1,  # Dashboard is default
-            key="main_navigation",
-            styles={
-                "container": {"padding": "0!important", "background-color": "#fafafa"},
-                "icon": {"color": "orange", "font-size": "25px"}, 
-                "nav-link": {"font-size": "16px", "text-align": "left", "margin":"0px", "--hover-color": "#eee"},
-                "nav-link-selected": {"background-color": "#02ab21"},
-            }
-        )
-        
-        st.markdown("---")
-        
-        # Logout button - Compact
+                st.caption('🎯 Demo Mode')
+
+        # Logout button - Compact at very bottom
         if st.button("🚪 Logout", use_container_width=True):
             SessionManager.sign_out()
 
     # Main content based on selected page
-    if selected == "Organizations Dashboard":
-        st.markdown('<h1 class="main-header">🏢 Organizations Dashboard</h1>', unsafe_allow_html=True)
+    if selected == "My Org" or selected == "Organizations Dashboard":
+        # My Org page (renamed from Organizations Dashboard)
         
         # Check if demo mode
         is_demo_mode = False
@@ -721,12 +901,8 @@ def show_main_app():
     elif selected == "Properties":
         properties.render_properties()
 
-    elif selected == "Income":
-        # Income is now part of Accounting, but keep for backward compatibility
-        accounting.render_accounting()
-
-    elif selected == "Expenses":
-        # Expenses is now part of Accounting, but keep for backward compatibility
+    elif selected == "Accounting" or selected == "Income" or selected == "Expenses":
+        # Unified Accounting page with Income and Expenses tabs
         accounting.render_accounting()
 
     elif selected == "Analytics":
@@ -755,10 +931,14 @@ def main():
     """Main application function"""
     # Set default navigation state
     set_default_navigation()
-    
+
+    # Initialize auth mode BEFORE anything else to ensure Sign In is default
+    if 'auth_mode' not in st.session_state:
+        st.session_state.auth_mode = 'signin'
+
     # Initialize session management
     SessionManager.initialize_session()
-    
+
     if SessionManager.is_authenticated():
         show_main_app()
     else:
