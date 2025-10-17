@@ -18,6 +18,7 @@ class IncomeType(str, Enum):
 
 class ExpenseType(str, Enum):
     MORTGAGE = "mortgage"
+    HOA = "hoa"
     MAINTENANCE = "maintenance"
     REPAIRS = "repairs"
     UTILITIES = "utilities"

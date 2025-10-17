@@ -6,77 +6,14 @@ Extracted from app_auth.py for better maintainability
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from datetime import datetime, date, timedelta
+import plotly.express as px
 from database.database_operations import DatabaseOperations
 
 def render_dashboard():
     """Render the Dashboard page"""
     db = DatabaseOperations()
 
-    # Custom CSS to reduce metric font sizes and spacing
-    st.markdown("""
-    <style>
-    /* Reduce metric value font size */
-    [data-testid="stMetricValue"] {
-        font-size: 1.2rem !important;
-    }
-    /* Reduce metric label font size */
-    [data-testid="stMetricLabel"] {
-        font-size: 0.85rem !important;
-    }
-    /* Reduce metric delta font size */
-    [data-testid="stMetricDelta"] {
-        font-size: 0.75rem !important;
-    }
-    /* Reduce vertical spacing between sections */
-    .block-container {
-        padding-top: 2rem !important;
-        padding-bottom: 1rem !important;
-    }
-    /* Reduce spacing in columns */
-    [data-testid="column"] {
-        gap: 0.5rem !important;
-    }
-    /* Reduce horizontal rule spacing */
-    hr {
-        margin-top: 0.5rem !important;
-        margin-bottom: 0.5rem !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # Date Filter dropdown (30% width)
-    date_col, spacer_col = st.columns([3, 7])
-
-    with date_col:
-        st.markdown('<p style="font-size: 0.9rem; font-weight: 600; color: #1f77b4;">Date Filter</p>', unsafe_allow_html=True)
-        date_filter = st.selectbox(
-            "Select Date Range",
-            options=["Current Year", "Last 30 Days", "Last 90 Days", "Last 12 Months", "All Time"],
-            index=0,
-            key="dashboard_date_filter",
-            label_visibility="collapsed"
-        )
-
-    # Calculate date range based on filter
-    today = date.today()
-    if date_filter == "Current Year":
-        start_date = date(today.year, 1, 1)
-        end_date = today
-    elif date_filter == "Last 30 Days":
-        start_date = today - timedelta(days=30)
-        end_date = today
-    elif date_filter == "Last 90 Days":
-        start_date = today - timedelta(days=90)
-        end_date = today
-    elif date_filter == "Last 12 Months":
-        start_date = today - timedelta(days=365)
-        end_date = today
-    else:  # All Time
-        start_date = date(2020, 1, 1)
-        end_date = today
-
-    st.markdown("---")
+    st.markdown('<h1 class="main-header">🏠 PropLedger Dashboard</h1>', unsafe_allow_html=True)
 
     # Get data based on authentication mode
     is_demo_mode = False
@@ -206,14 +143,29 @@ def render_dashboard():
             profit_margin = (net_income / total_income * 100) if total_income > 0 else 0
             roi = (net_income / total_purchase_price * 100) if total_purchase_price > 0 else 0
 
-            # Main 60/40 split for entire dashboard content
-            left_column, right_column = st.columns([3, 2])
+            # Income breakdown by type
+            income_by_type = {}
+            for inc in org_income:
+                income_type = inc.income_type.title()
+                if income_type not in income_by_type:
+                    income_by_type[income_type] = 0
+                income_by_type[income_type] += inc.amount
 
-            with left_column:
-                # Financial Summary section
-                st.markdown('<p style="font-size: 1rem; font-weight: 600;">📊 Financial Summary</p>', unsafe_allow_html=True)
+            # Expense breakdown by type
+            expense_by_type = {}
+            for exp in org_expenses:
+                expense_type = exp.expense_type.title()
+                if expense_type not in expense_by_type:
+                    expense_by_type[expense_type] = 0
+                expense_by_type[expense_type] += exp.amount
 
-                # Two rows of 3 metrics each
+            # Create 60/40 vertical split layout
+            left_col, right_col = st.columns([3, 2])  # 60% left, 40% right
+
+            with left_col:
+                # 1. Financial Summary on left (2 rows of 3 metrics)
+                st.markdown("### 📊 Financial Summary")
+
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     st.metric("🏠 Properties", total_properties)
@@ -230,166 +182,139 @@ def render_dashboard():
                 with col6:
                     st.metric("📊 ROI", f"{roi:.1f}%")
 
-                st.markdown('<div style="margin: 1rem 0;"></div>', unsafe_allow_html=True)
+                st.markdown("---")
 
-                # Income & Expense Breakdown section
-                st.markdown('<p style="font-size: 1rem; font-weight: 600;">💰 Income & Expense Breakdown</p>', unsafe_allow_html=True)
+                # 2. Income & Expense Breakdown on left
+                st.markdown("### 💰 Income & Expense Breakdown")
 
-                # Income breakdown
-                income_by_type = {}
-                for inc in org_income:
-                    income_type = inc.income_type.title()
-                    if income_type not in income_by_type:
-                        income_by_type[income_type] = 0
-                    income_by_type[income_type] += inc.amount
-
-                # Expense breakdown
-                expense_by_type = {}
-                for exp in org_expenses:
-                    expense_type = exp.expense_type.title()
-                    if expense_type not in expense_by_type:
-                        expense_by_type[expense_type] = 0
-                    expense_by_type[expense_type] += exp.amount
-
-                # Create single row layout for income and expenses
                 if income_by_type or expense_by_type:
-                    # Combine all types into one row
-                    all_types = list(income_by_type.items()) + list(expense_by_type.items())
-                    if all_types:
-                        type_cols = st.columns(min(len(all_types), 4))  # Max 4 columns
-                        for i, (type_name, amount) in enumerate(all_types[:4]):  # Limit to 4 items
-                            with type_cols[i]:
-                                icon = "💰" if type_name in [inc[0] for inc in income_by_type.items()] else "💸"
-                                st.metric(f"{icon} {type_name}", f"${amount:,.0f}")
+                    # Display income types
+                    if income_by_type:
+                        income_cols = st.columns(len(income_by_type))
+                        for i, (income_type, amount) in enumerate(income_by_type.items()):
+                            with income_cols[i]:
+                                st.metric(f"💰 {income_type}", f"${amount:,.0f}")
+
+                    # Display expense types
+                    if expense_by_type:
+                        expense_cols = st.columns(len(expense_by_type))
+                        for i, (expense_type, amount) in enumerate(expense_by_type.items()):
+                            with expense_cols[i]:
+                                st.metric(f"💸 {expense_type}", f"${amount:,.0f}")
                 else:
                     st.info("No income or expense records found")
 
-                st.markdown('<div style="margin: 1rem 0;"></div>', unsafe_allow_html=True)
+                st.markdown("---")
 
-                # Recent Activity table (Last 10 Transactions)
-                st.markdown('<p style="font-size: 1rem; font-weight: 600;">📋 Recent Activity (Last 10 Transactions)</p>', unsafe_allow_html=True)
+                # 3. Recent Activity (Last 10 Transactions) on left
+                st.markdown("### 📋 Recent Activity (Last 10 Transactions)")
 
-                # Combine recent income and expenses into a single list
-                recent_transactions = []
-
+                # Combine and sort all transactions by date
+                all_transactions = []
                 for inc in org_income:
                     prop_name = next((p.name for p in org_properties if p.id == inc.property_id), "Unknown")
-                    recent_transactions.append({
-                        'Property': prop_name,
-                        'Category': 'Income',
-                        'Type': inc.income_type.title(),
-                        'Amount': f"${inc.amount:,.2f}",
-                        'Description': inc.description or 'Monthly Rent',
-                        'Date': inc.transaction_date.strftime('%Y-%m-%d')
+                    all_transactions.append({
+                        'date': inc.transaction_date,
+                        'property': prop_name,
+                        'category': 'Income',
+                        'type': inc.income_type.title(),
+                        'amount': inc.amount,
+                        'description': inc.description or ''
                     })
 
                 for exp in org_expenses:
                     prop_name = next((p.name for p in org_properties if p.id == exp.property_id), "Unknown")
-                    recent_transactions.append({
-                        'Property': prop_name,
-                        'Category': 'Expense',
-                        'Type': exp.expense_type.title(),
-                        'Amount': f"${exp.amount:,.2f}",
-                        'Description': exp.description or exp.expense_type.title(),
-                        'Date': exp.transaction_date.strftime('%Y-%m-%d')
+                    all_transactions.append({
+                        'date': exp.transaction_date,
+                        'property': prop_name,
+                        'category': 'Expense',
+                        'type': exp.expense_type.title(),
+                        'amount': exp.amount,
+                        'description': exp.description or ''
                     })
 
-                # Sort by date and take last 10
-                recent_transactions.sort(key=lambda x: x['Date'], reverse=True)
-                recent_transactions = recent_transactions[:10]
+                # Sort by date (most recent first) and take last 10
+                recent_transactions = sorted(all_transactions, key=lambda x: x['date'], reverse=True)[:10]
 
                 if recent_transactions:
-                    # Create DataFrame for table display
+                    # Create DataFrame for display
                     df_transactions = pd.DataFrame(recent_transactions)
-                    st.dataframe(df_transactions, use_container_width=True, hide_index=True)
-                else:
-                    st.info("No recent transactions found")
+                    df_transactions['date'] = pd.to_datetime(df_transactions['date']).dt.strftime('%Y-%m-%d')
+                    df_transactions['amount'] = df_transactions['amount'].apply(lambda x: f"${x:,.2f}")
 
-            with right_column:
-                # Charts section
-                st.markdown('<p style="font-size: 1rem; font-weight: 600;">📈 Financial Summary</p>', unsafe_allow_html=True)
-
-                # Financial Overview section with bar chart
-                st.markdown('<p style="font-size: 0.9rem; font-weight: 600;">Financial Overview</p>', unsafe_allow_html=True)
-
-                # Bar chart showing income vs expenses vs net income
-                fig = go.Figure(data=[
-                    go.Bar(name='Income', x=['Category'], y=[total_income], marker_color='#16a34a', text=[f'${total_income:,.0f}'], textposition='inside'),
-                    go.Bar(name='Expenses', x=['Category'], y=[total_expenses], marker_color='#dc2626', text=[f'${total_expenses:,.0f}'], textposition='inside'),
-                    go.Bar(name='Net Income', x=['Category'], y=[net_income], marker_color='#2563eb', text=[f'${net_income:,.0f}'], textposition='inside')
-                ])
-                fig.update_layout(
-                    xaxis_title="Category",
-                    yaxis_title="Amount ($)",
-                    barmode='group',
-                    height=280,
-                    showlegend=True,
-                    margin=dict(l=40, r=20, t=20, b=40),
-                    font=dict(size=10),
-                    legend=dict(font=dict(size=10))
-                )
-                st.plotly_chart(fig, use_container_width=True)
-
-                # Income Breakdown section with donut chart
-                st.markdown('<p style="font-size: 0.9rem; font-weight: 600;">💰 Income Breakdown</p>', unsafe_allow_html=True)
-
-                # Calculate income breakdown
-                income_by_type_chart = {}
-                for inc in org_income:
-                    income_type = inc.income_type.title()
-                    if income_type not in income_by_type_chart:
-                        income_by_type_chart[income_type] = 0
-                    income_by_type_chart[income_type] += inc.amount
-
-                if income_by_type_chart:
-                    labels = list(income_by_type_chart.keys())
-                    values = list(income_by_type_chart.values())
-
-                    fig = go.Figure(data=[go.Pie(
-                        labels=labels,
-                        values=values,
-                        hole=0.4,
-                        marker=dict(colors=['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'])
-                    )])
-                    fig.update_layout(
-                        height=280,
-                        margin=dict(l=20, r=20, t=20, b=20),
-                        showlegend=True,
-                        font=dict(size=10),
-                        legend=dict(font=dict(size=10))
+                    # Display as table
+                    st.dataframe(
+                        df_transactions[['property', 'category', 'type', 'amount', 'description', 'date']],
+                        use_container_width=True,
+                        hide_index=True
                     )
-                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info("No transactions found")
+
+            with right_col:
+                # 1. Financial Overview Chart on right
+                st.markdown("### 📊 Financial Summary")
+
+                # Bar chart for Income vs Expenses vs Net Income
+                fig_overview = go.Figure()
+                fig_overview.add_trace(go.Bar(
+                    name='Income',
+                    x=['Income'],
+                    y=[total_income],
+                    marker_color='green'
+                ))
+                fig_overview.add_trace(go.Bar(
+                    name='Expenses',
+                    x=['Expenses'],
+                    y=[total_expenses],
+                    marker_color='red'
+                ))
+                fig_overview.add_trace(go.Bar(
+                    name='Net Income',
+                    x=['Net Income'],
+                    y=[net_income],
+                    marker_color='blue'
+                ))
+                fig_overview.update_layout(
+                    title="Financial Overview",
+                    showlegend=True,
+                    height=300,
+                    margin=dict(l=0, r=0, t=40, b=0)
+                )
+                st.plotly_chart(fig_overview, use_container_width=True)
+
+                st.markdown("---")
+
+                # 2. Income Breakdown Pie Chart on right
+                if income_by_type:
+                    st.markdown("### 💰 Income Breakdown")
+                    fig_income = px.pie(
+                        values=list(income_by_type.values()),
+                        names=list(income_by_type.keys()),
+                        title="Income by Type"
+                    )
+                    fig_income.update_layout(
+                        height=300,
+                        margin=dict(l=0, r=0, t=40, b=0)
+                    )
+                    st.plotly_chart(fig_income, use_container_width=True)
                 else:
                     st.info("No income data available")
 
-                # Expense Breakdown section with donut chart
-                st.markdown('<p style="font-size: 0.9rem; font-weight: 600;">💸 Expense Breakdown</p>', unsafe_allow_html=True)
+                st.markdown("---")
 
-                # Calculate expense breakdown
-                expense_by_type_chart = {}
-                for exp in org_expenses:
-                    expense_type = exp.expense_type.title()
-                    if expense_type not in expense_by_type_chart:
-                        expense_by_type_chart[expense_type] = 0
-                    expense_by_type_chart[expense_type] += exp.amount
-
-                if expense_by_type_chart:
-                    labels = list(expense_by_type_chart.keys())
-                    values = list(expense_by_type_chart.values())
-
-                    fig = go.Figure(data=[go.Pie(
-                        labels=labels,
-                        values=values,
-                        hole=0.4,
-                        marker=dict(colors=['#ef4444', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6'])
-                    )])
-                    fig.update_layout(
-                        height=280,
-                        margin=dict(l=20, r=20, t=20, b=20),
-                        showlegend=True,
-                        font=dict(size=10),
-                        legend=dict(font=dict(size=10))
+                # 3. Expense Breakdown Pie Chart on right
+                if expense_by_type:
+                    st.markdown("### 💸 Expense Breakdown")
+                    fig_expense = px.pie(
+                        values=list(expense_by_type.values()),
+                        names=list(expense_by_type.keys()),
+                        title="Expenses by Type"
                     )
-                    st.plotly_chart(fig, use_container_width=True)
+                    fig_expense.update_layout(
+                        height=300,
+                        margin=dict(l=0, r=0, t=40, b=0)
+                    )
+                    st.plotly_chart(fig_expense, use_container_width=True)
                 else:
                     st.info("No expense data available")

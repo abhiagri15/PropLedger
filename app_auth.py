@@ -15,7 +15,7 @@ import os
 from dotenv import load_dotenv
 
 # Import page modules
-from pages import dashboard, properties, accounting, analytics, rent_reminders, reports, budgets, capex, vendors, ai_insights
+from modules import dashboard, properties, accounting, analytics, rent_reminders, reports, budgets, capex, vendors, ai_insights
 
 # Load environment variables
 load_dotenv()
@@ -127,7 +127,45 @@ st.markdown("""
         border-left: 4px solid #1f77b4;
         margin: 1rem 0;
     }
-    
+
+    /* Global compact font sizes for all metrics and numbers */
+    [data-testid="stMetricValue"] {
+        font-size: 1.2rem !important;
+        font-weight: 600 !important;
+    }
+
+    [data-testid="stMetricLabel"] {
+        font-size: 0.8rem !important;
+        font-weight: 500 !important;
+    }
+
+    [data-testid="stMetricDelta"] {
+        font-size: 0.7rem !important;
+    }
+
+    /* Reduce dataframe text size */
+    .dataframe {
+        font-size: 0.85rem !important;
+    }
+
+    /* Reduce heading sizes */
+    h1 {
+        font-size: 1.8rem !important;
+    }
+
+    h2 {
+        font-size: 1.4rem !important;
+    }
+
+    h3 {
+        font-size: 1.2rem !important;
+    }
+
+    /* Reduce chart title sizes */
+    .plotly .gtitle {
+        font-size: 0.9rem !important;
+    }
+
     /* Auto-highlight Dashboard on page load */
     .stOptionMenu [data-testid="stOptionMenu"] [role="menuitem"]:nth-child(2) {
         background-color: #02ab21 !important;
@@ -691,88 +729,7 @@ def show_main_app():
                 if st.form_submit_button("Create Demo Organization", type="primary"):
                     st.success(f"Demo organization '{demo_org_name_1}' would be created!")
                     st.info("Sign up to create real organizations and manage your properties!")
-        
-        else:
-            # Real mode - show message for now
-            st.info("Real organization management - Sign up to use with your own data!")
-        
-        if is_demo_mode:
-            # Demo mode - show sample organizations
-            st.markdown('<div class="info-box">🎯 <strong>Demo Mode</strong> - Showing sample organizations. Sign up to manage your own organizations!</div>', unsafe_allow_html=True)
-            
-            # Sample organizations for demo
-            demo_organizations = [
-                {
-                    'name': 'Demo Property Group',
-                    'description': 'Sample property management company',
-                    'created_at': '2024-01-15',
-                    'properties': 3,
-                    'total_value': 750000,
-                    'monthly_rent': 4500,
-                    'total_income': 54000,
-                    'total_expenses': 24000,
-                    'net_income': 30000
-                },
-                {
-                    'name': 'Sample Real Estate LLC',
-                    'description': 'Demo real estate investment company',
-                    'created_at': '2024-02-20',
-                    'properties': 2,
-                    'total_value': 500000,
-                    'monthly_rent': 3200,
-                    'total_income': 38400,
-                    'total_expenses': 18000,
-                    'net_income': 20400
-                }
-            ]
-            
-            st.markdown("### Sample Organizations")
-            
-            for org in demo_organizations:
-                with st.expander(f"🏢 {org['name']}", expanded=True):
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.markdown(f"**Description:** {org['description']}")
-                        st.markdown(f"**Created:** {org['created_at']}")
-                    
-                    with col2:
-                        st.metric("Properties", org['properties'])
-                        st.metric("Total Value", f"${org['total_value']:,.2f}")
-                        st.metric("Monthly Rent", f"${org['monthly_rent']:,.2f}")
-                        
-                        # P&L Summary
-                        st.markdown("**Financial Summary:**")
-                        col_a, col_b, col_c = st.columns(3)
-                        with col_a:
-                            st.metric("Total Income", f"${org['total_income']:,.2f}")
-                        with col_b:
-                            st.metric("Total Expenses", f"${org['total_expenses']:,.2f}")
-                        with col_c:
-                            st.metric("Net Income", f"${org['net_income']:,.2f}")
-                        
-                        # Profit margin
-                        profit_margin = (org['net_income'] / org['total_income'] * 100) if org['total_income'] > 0 else 0
-                        st.metric("Profit Margin", f"{profit_margin:.1f}%")
-            
-            # Demo organization creation
-            st.markdown("---")
-            st.markdown("### Create New Organization (Demo)")
-            
-            with st.form("demo_org_form_1"):
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    demo_org_name_1 = st.text_input("Organization Name", value="My Demo Company", key="demo_org_name_1")
-                    demo_org_desc_1 = st.text_area("Description", value="A sample organization for demonstration", key="demo_org_desc_1")
-                
-                with col2:
-                    st.info("**Demo Note:** This is a demonstration. In the real app, this would create an actual organization in your database.")
-                
-                if st.form_submit_button("Create Demo Organization", type="primary"):
-                    st.success(f"Demo organization '{demo_org_name_1}' would be created!")
-                    st.info("Sign up to create real organizations and manage your properties!")
-        
+
         else:
             # Real mode - get user organizations
             if st.session_state.user:
