@@ -751,8 +751,8 @@ def show_main_app():
 
                     with st.expander(f"🏢 {org.name}", expanded=is_expanded):
                         # Get organization data
-                        properties = db.get_properties()
-                        org_properties = [p for p in properties if p.organization_id == org.id]
+                        all_properties = db.get_properties()
+                        org_properties = [p for p in all_properties if p.organization_id == org.id]
 
                         # Display basic info
                         st.markdown(f"**Description:** {org.description or 'No description provided'}")

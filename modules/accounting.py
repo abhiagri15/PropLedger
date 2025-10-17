@@ -14,13 +14,10 @@ def render_accounting():
     """Render the Accounting page with Income and Expenses tabs"""
     db = DatabaseOperations()
 
-    st.markdown('<h1 class="main-header">💰 Accounting</h1>', unsafe_allow_html=True)
-
     # Use native Streamlit tabs to match reference design
     income_tab, expense_tab = st.tabs(["🔥 Income", "✅ Expenses"])
 
     with income_tab:
-        st.markdown('<h2 class="sub-header">💰 Income Tracking</h2>', unsafe_allow_html=True)
 
         # Check if demo mode
         is_demo_mode = False
@@ -91,18 +88,46 @@ def render_accounting():
         with tab1:
 
             if org_properties:
-                # Filter by property with unique key
-                property_names = {prop.id: prop.name for prop in org_properties}
-                selected_property_id = st.selectbox("Filter by Property", ["All"] + list(property_names.keys()),
-                                                  format_func=lambda x: "All" if x == "All" else property_names[x],
-                                                  key="income_view_property_filter")
+                # Filter by property and date with submit button
+                col1, col2, col3 = st.columns([2, 2, 1])
+                with col1:
+                    property_names = {prop.id: prop.name for prop in org_properties}
+                    selected_property_id = st.selectbox("Filter by Property", ["All"] + list(property_names.keys()),
+                                                      format_func=lambda x: "All" if x == "All" else property_names[x],
+                                                      key="income_view_property_filter")
+                with col2:
+                    date_filter = st.selectbox("Date Filter", ["Current Month", "Last 3 Months", "Last 6 Months", "This Year", "All Time"],
+                                              key="income_date_filter")
+                with col3:
+                    st.markdown("<br>", unsafe_allow_html=True)  # Add spacing to align button
+                    apply_filter = st.button("Apply Filter", key="income_apply_filter", type="primary")
 
                 if selected_property_id == "All":
                     income_records = db.get_all_income()
                 else:
                     income_records = db.get_income_by_property(selected_property_id)
 
+                # Apply date filter
+                if income_records and date_filter != "All Time":
+                    from datetime import datetime, timedelta
+                    today = datetime.now().date()  # Convert to date for comparison
+
+                    if date_filter == "Current Month":
+                        start_date = today.replace(day=1)
+                    elif date_filter == "Last 3 Months":
+                        start_date = today - timedelta(days=90)
+                    elif date_filter == "Last 6 Months":
+                        start_date = today - timedelta(days=180)
+                    elif date_filter == "This Year":
+                        start_date = today.replace(month=1, day=1)
+
+                    # Convert transaction_date to date if it's a datetime object
+                    income_records = [inc for inc in income_records
+                                     if (inc.transaction_date.date() if hasattr(inc.transaction_date, 'date') else inc.transaction_date) >= start_date]
+
                 if income_records:
+                    st.info(f"Found {len(income_records)} income transactions")
+
                     # Display income records
                     income_data = []
                     for inc in income_records:
@@ -116,6 +141,8 @@ def render_accounting():
                         })
 
                     df_income = pd.DataFrame(income_data)
+                    # Reset index to start from 1 instead of 0
+                    df_income.index = range(1, len(df_income) + 1)
                     st.dataframe(df_income, use_container_width=True)
 
                     # Income summary
@@ -304,7 +331,6 @@ def render_accounting():
                 st.info(f"No properties found for {org_name}. Please add a property first.")
 
     with expense_tab:
-        st.markdown('<h2 class="sub-header">💸 Expense Tracking</h2>', unsafe_allow_html=True)
 
         # Check if demo mode
         is_demo_mode = False
@@ -375,8 +401,8 @@ def render_accounting():
         with exp_tab1:
 
             if org_properties:
-                # Filter by property with unique key
-                col1, col2 = st.columns(2)
+                # Filter by property and date with submit button
+                col1, col2, col3 = st.columns([2, 2, 1])
                 with col1:
                     property_names = {prop.id: prop.name for prop in org_properties}
                     selected_property_id = st.selectbox("Filter by Property", ["All"] + list(property_names.keys()),
@@ -385,11 +411,32 @@ def render_accounting():
                 with col2:
                     date_filter = st.selectbox("Date Filter", ["Current Month", "Last 3 Months", "Last 6 Months", "This Year", "All Time"],
                                               key="expense_date_filter")
+                with col3:
+                    st.markdown("<br>", unsafe_allow_html=True)  # Add spacing to align button
+                    apply_filter = st.button("Apply Filter", key="expense_apply_filter", type="primary")
 
                 if selected_property_id == "All":
                     expense_records = db.get_all_expenses()
                 else:
                     expense_records = db.get_expenses_by_property(selected_property_id)
+
+                # Apply date filter
+                if expense_records and date_filter != "All Time":
+                    from datetime import datetime, timedelta
+                    today = datetime.now().date()  # Convert to date for comparison
+
+                    if date_filter == "Current Month":
+                        start_date = today.replace(day=1)
+                    elif date_filter == "Last 3 Months":
+                        start_date = today - timedelta(days=90)
+                    elif date_filter == "Last 6 Months":
+                        start_date = today - timedelta(days=180)
+                    elif date_filter == "This Year":
+                        start_date = today.replace(month=1, day=1)
+
+                    # Convert transaction_date to date if it's a datetime object
+                    expense_records = [exp for exp in expense_records
+                                      if (exp.transaction_date.date() if hasattr(exp.transaction_date, 'date') else exp.transaction_date) >= start_date]
 
                 if expense_records:
                     st.info(f"Found {len(expense_records)} expense transactions")
@@ -422,7 +469,9 @@ def render_accounting():
                         })
 
                     df_expense = pd.DataFrame(expense_data)
-                    st.dataframe(df_expense, use_container_width=True, hide_index=True)
+                    # Reset index to start from 1 instead of 0
+                    df_expense.index = range(1, len(df_expense) + 1)
+                    st.dataframe(df_expense, use_container_width=True)
 
                     # Total Expenses summary
                     total_expenses = sum(exp.amount for exp in expense_records)

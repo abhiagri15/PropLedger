@@ -273,78 +273,35 @@ def render_properties():
                     # Get financial summary for each property
                     financial_summary = db.get_property_financial_summary(prop.id)
 
-                    # Property card with expander
-                    with st.expander(f"🏠 **{prop.name}**", expanded=True):
-                        # Address and Type
+                    # Property card with expander - more compact layout
+                    with st.expander(f"🏠 {prop.name}", expanded=False):
+                        # Address and Type on same line
                         st.markdown(f"**Address:** {prop.address}")
                         st.markdown(f"**Type:** {prop.property_type.title()}")
 
-                        # Financial metrics in columns
-                        st.markdown("---")
+                        # Monthly Rent and Purchase Price in two columns
                         col1, col2 = st.columns(2)
-
                         with col1:
-                            st.markdown(f"""
-                            <div style="text-align: center;">
-                                <p style="margin: 0; color: #666; font-size: 0.9rem;">Monthly Rent</p>
-                                <p style="margin: 0; font-size: 1.2rem; font-weight: bold;">${prop.monthly_rent:,.2f}</p>
-                            </div>
-                            """, unsafe_allow_html=True)
-
+                            st.markdown(f"**Monthly Rent**  \n${prop.monthly_rent:,.0f}")
                         with col2:
-                            st.markdown(f"""
-                            <div style="text-align: center;">
-                                <p style="margin: 0; color: #666; font-size: 0.9rem;">Purchase Price</p>
-                                <p style="margin: 0; font-size: 1.2rem; font-weight: bold;">${prop.purchase_price:,.2f}</p>
-                            </div>
-                            """, unsafe_allow_html=True)
+                            st.markdown(f"**Purchase Price**  \n${prop.purchase_price:,.0f}")
 
-                        st.markdown("---")
-
-                        # Income and Expenses metrics
+                        # Financial metrics all on one row - 4 columns
                         col1, col2, col3, col4 = st.columns(4)
-
                         with col1:
-                            st.markdown(f"""
-                            <div style="text-align: center;">
-                                <p style="margin: 0; color: #666; font-size: 0.8rem;">Total Income</p>
-                                <p style="margin: 0; font-size: 1rem; font-weight: bold;">${financial_summary['total_income']:,.2f}</p>
-                            </div>
-                            """, unsafe_allow_html=True)
-
+                            st.markdown(f"**Total Income**  \n${financial_summary['total_income']:,.0f}")
                         with col2:
-                            st.markdown(f"""
-                            <div style="text-align: center;">
-                                <p style="margin: 0; color: #666; font-size: 0.8rem;">Total Expenses</p>
-                                <p style="margin: 0; font-size: 1rem; font-weight: bold;">${financial_summary['total_expenses']:,.2f}</p>
-                            </div>
-                            """, unsafe_allow_html=True)
-
+                            st.markdown(f"**Total Expenses**  \n${financial_summary['total_expenses']:,.0f}")
                         with col3:
-                            st.markdown(f"""
-                            <div style="text-align: center;">
-                                <p style="margin: 0; color: #666; font-size: 0.8rem;">Net Income</p>
-                                <p style="margin: 0; font-size: 1rem; font-weight: bold;">${financial_summary['net_income']:,.2f}</p>
-                            </div>
-                            """, unsafe_allow_html=True)
-
+                            st.markdown(f"**Net Income**  \n${financial_summary['net_income']:,.0f}")
                         with col4:
-                            st.markdown(f"""
-                            <div style="text-align: center;">
-                                <p style="margin: 0; color: #666; font-size: 0.8rem;">ROI</p>
-                                <p style="margin: 0; font-size: 1rem; font-weight: bold;">{financial_summary['roi']:.1f}%</p>
-                            </div>
-                            """, unsafe_allow_html=True)
-
-                        st.markdown("---")
+                            st.markdown(f"**ROI**  \n{financial_summary['roi']:.1f}%")
 
                         # Action buttons
                         col1, col2 = st.columns(2)
-
                         with col1:
                             if st.button(f"✏️ Edit", key=f"manage_edit_{prop.id}", use_container_width=True):
                                 st.session_state[f'editing_{prop.id}'] = True
-
                         with col2:
                             if st.button(f"🗑️ Delete", key=f"manage_delete_{prop.id}", type="secondary", use_container_width=True):
                                 if db.delete_property(prop.id):
