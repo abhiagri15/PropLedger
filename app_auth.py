@@ -143,6 +143,28 @@ st.markdown("""
         font-size: 0.7rem !important;
     }
 
+    /* Reduce spacing between metrics */
+    [data-testid="stMetric"] {
+        padding-top: 0.3rem !important;
+        padding-bottom: 0.3rem !important;
+    }
+
+    /* Reduce spacing in expander content */
+    [data-testid="stExpander"] > div > div {
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+    }
+
+    /* Reduce top padding for main content area */
+    .main .block-container {
+        padding-top: 1rem !important;
+    }
+
+    /* Reduce spacing around selectbox */
+    [data-testid="stSelectbox"] {
+        margin-bottom: 0.5rem !important;
+    }
+
     /* Reduce dataframe text size */
     .dataframe {
         font-size: 0.85rem !important;
@@ -649,214 +671,188 @@ def show_main_app():
 
     # Main content based on selected page
     if selected == "My Org" or selected == "Organizations Dashboard":
-        # My Org page (renamed from Organizations Dashboard)
-        
-        # Check if demo mode
-        is_demo_mode = False
-        if st.session_state.user:
-            if hasattr(st.session_state.user, 'email'):
-                is_demo_mode = getattr(st.session_state.user, 'email', '') == 'demo@example.com'
-            else:
-                is_demo_mode = st.session_state.user.get('email', '') == 'demo@example.com'
-        
-        if is_demo_mode:
-            # Demo mode - show sample organizations
-            st.markdown('<div class="info-box">🎯 <strong>Demo Mode</strong> - Showing sample organizations. Sign up to manage your own organizations!</div>', unsafe_allow_html=True)
-            
-            # Sample organizations for demo
-            demo_organizations = [
-                {
-                    'name': 'Demo Property Group',
-                    'description': 'Sample property management company',
-                    'created_at': '2024-01-15',
-                    'properties': 3,
-                    'total_value': 750000,
-                    'monthly_rent': 4500,
-                    'total_income': 54000,
-                    'total_expenses': 24000,
-                    'net_income': 30000
-                },
-                {
-                    'name': 'Sample Real Estate LLC',
-                    'description': 'Demo real estate investment company',
-                    'created_at': '2024-02-20',
-                    'properties': 2,
-                    'total_value': 500000,
-                    'monthly_rent': 3200,
-                    'total_income': 38400,
-                    'total_expenses': 18000,
-                    'net_income': 20400
-                }
-            ]
-            
-            st.markdown("### Sample Organizations")
-            
-            for org in demo_organizations:
-                with st.expander(f"🏢 {org['name']}", expanded=True):
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.markdown(f"**Description:** {org['description']}")
-                        st.markdown(f"**Created:** {org['created_at']}")
-                    
-                    with col2:
-                        st.metric("Properties", org['properties'])
-                        st.metric("Total Value", f"${org['total_value']:,.2f}")
-                        st.metric("Monthly Rent", f"${org['monthly_rent']:,.2f}")
-                        
-                        # P&L Summary
-                        st.markdown("**Financial Summary:**")
-                        col_a, col_b, col_c = st.columns(3)
-                        with col_a:
-                            st.metric("Total Income", f"${org['total_income']:,.2f}")
-                        with col_b:
-                            st.metric("Total Expenses", f"${org['total_expenses']:,.2f}")
-                        with col_c:
-                            st.metric("Net Income", f"${org['net_income']:,.2f}")
-                        
-                        # Profit margin
-                        profit_margin = (org['net_income'] / org['total_income'] * 100) if org['total_income'] > 0 else 0
-                        st.metric("Profit Margin", f"{profit_margin:.1f}%")
-            
-            # Demo organization creation
-            st.markdown("---")
-            st.markdown("### Create New Organization (Demo)")
-            
-            with st.form("demo_org_form_1"):
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    demo_org_name_1 = st.text_input("Organization Name", value="My Demo Company", key="demo_org_name_1")
-                    demo_org_desc_1 = st.text_area("Description", value="A sample organization for demonstration", key="demo_org_desc_1")
-                
-                with col2:
-                    st.info("**Demo Note:** This is a demonstration. In the real app, this would create an actual organization in your database.")
-                
-                if st.form_submit_button("Create Demo Organization", type="primary"):
-                    st.success(f"Demo organization '{demo_org_name_1}' would be created!")
-                    st.info("Sign up to create real organizations and manage your properties!")
+        # My Org page
 
-        else:
-            # Real mode - get user organizations
-            if st.session_state.user:
-                if hasattr(st.session_state.user, 'id'):
-                    user_id = st.session_state.user.id
-                else:
-                    user_id = st.session_state.user.get('id', None)
-                
-                if user_id:
-                    db = DatabaseOperations()
-                    organizations = db.get_user_organizations(user_id)
-                    
-                    if organizations:
-                        # Display organizations
-                        st.markdown("### Your Organizations")
-                        
-                        for org in organizations:
-                            with st.expander(f"🏢 {org.name}", expanded=True):
-                                col1, col2 = st.columns(2)
-                                
-                                with col1:
-                                    st.markdown(f"**Description:** {org.description or 'No description provided'}")
-                                    st.markdown(f"**Created:** {org.created_at.strftime('%Y-%m-%d') if org.created_at else 'Unknown'}")
-                                
-                                with col2:
-                                    # Get organization stats
-                                    properties = db.get_properties()
-                                    org_properties = [p for p in properties if p.organization_id == org.id]
-                                    
-                                    st.metric("Properties", len(org_properties))
-                                
-                                if org_properties:
-                                    total_value = sum(p.purchase_price for p in org_properties)
-                                    total_rent = sum(p.monthly_rent for p in org_properties)
-                                    st.metric("Total Value", f"${total_value:,.2f}")
-                                    st.metric("Monthly Rent", f"${total_rent:,.2f}")
-                                    
-                                    # Get financial data for P&L
-                                    all_income = db.get_all_income()
-                                    all_expenses = db.get_all_expenses()
-                                    
-                                    org_income = [inc for inc in all_income if inc.organization_id == org.id]
-                                    org_expenses = [exp for exp in all_expenses if exp.organization_id == org.id]
-                                    
-                                    total_income = sum(inc.amount for inc in org_income)
-                                    total_expenses = sum(exp.amount for exp in org_expenses)
-                                    net_income = total_income - total_expenses
-                                    profit_margin = (net_income / total_income * 100) if total_income > 0 else 0
-                                    roi = (net_income / total_value * 100) if total_value > 0 else 0
-                                    
-                                    st.metric("Total Income", f"${total_income:,.2f}")
-                                    st.metric("Total Expenses", f"${total_expenses:,.2f}")
-                                    st.metric("Net Income", f"${net_income:,.2f}")
-                                    st.metric("Profit Margin", f"{profit_margin:.1f}%")
-                                    st.metric("ROI", f"{roi:.1f}%")
-                            
-                            # Add P&L Summary section
-                            if org_properties and (org_income or org_expenses):
-                                st.markdown("---")
-                                st.markdown("### 📊 Profit & Loss Summary")
-                                
-                                col3, col4, col5 = st.columns(3)
-                                
-                                with col3:
-                                    st.metric("💰 Total Income", f"${total_income:,.2f}")
-                                with col4:
-                                    st.metric("💸 Total Expenses", f"${total_expenses:,.2f}")
-                                with col5:
-                                    color = "normal" if net_income >= 0 else "inverse"
-                                    st.metric("📈 Net Income", f"${net_income:,.2f}", delta=f"{profit_margin:.1f}% margin")
-                    
-                    # Add new organization button
-                    if st.button("➕ Add New Organization", type="primary"):
-                        st.session_state.show_add_org = True
-                    
-                    if st.session_state.get('show_add_org', False):
-                        st.markdown("### Add New Organization")
-                        with st.form("add_organization_form"):
-                            org_name = st.text_input("Organization Name", placeholder="Enter organization name")
-                            org_description = st.text_area("Description", placeholder="Enter organization description")
-                            
-                            submitted = st.form_submit_button("Create Organization", type="primary")
-                            
-                            if submitted and org_name:
-                                new_org = Organization(
-                                    name=org_name,
-                                    description=org_description if org_description else None
-                                )
-                                
-                                result = db.create_organization(new_org, user_id)
-                                if result:
-                                    st.success(f"Organization '{org_name}' created successfully!")
-                                    st.session_state.show_add_org = False
-                                    st.rerun()
-                                else:
-                                    st.error("Failed to create organization. Please try again.")
-                else:
-                    st.info("No organizations found. Create your first organization below.")
-                    
-                    # Create first organization
-                    st.markdown("### Create Your First Organization")
-                    with st.form("create_first_org_form"):
-                        org_name = st.text_input("Organization Name", placeholder="Enter your organization name")
+        # Get user organizations
+        user_id = None
+        if st.session_state.user:
+            if hasattr(st.session_state.user, 'id'):
+                user_id = st.session_state.user.id
+            else:
+                user_id = st.session_state.user.get('id', None)
+
+        if user_id:
+            db = DatabaseOperations()
+            organizations = db.get_user_organizations(user_id)
+
+            if organizations:
+                # Organization and Date Filter dropdowns at top
+                col1, col2 = st.columns([1, 1])
+
+                with col1:
+                    # Organization selector
+                    org_names = {org.id: org.name for org in organizations}
+                    if 'my_org_selected' not in st.session_state:
+                        st.session_state.my_org_selected = organizations[0].id
+
+                    selected_org_id = st.selectbox(
+                        "Select Organization",
+                        options=list(org_names.keys()),
+                        format_func=lambda x: org_names[x],
+                        index=list(org_names.keys()).index(st.session_state.my_org_selected) if st.session_state.my_org_selected in org_names else 0,
+                        key="my_org_selector"
+                    )
+                    st.session_state.my_org_selected = selected_org_id
+
+                with col2:
+                    # Date Filter
+                    date_filter = st.selectbox(
+                        "Date Filter",
+                        options=["Current Year", "Last 3 Months", "Last 6 Months", "This Year", "All Time"],
+                        index=0,
+                        key="my_org_date_filter"
+                    )
+
+                # Calculate aggregated P&L for all organizations
+                all_income = db.get_all_income()
+                all_expenses = db.get_all_expenses()
+
+                # Get organization IDs
+                org_ids = [org.id for org in organizations]
+
+                # Filter income and expenses for all user organizations
+                user_income = [inc for inc in all_income if inc.organization_id in org_ids]
+                user_expenses = [exp for exp in all_expenses if exp.organization_id in org_ids]
+
+                total_income_all = sum(inc.amount for inc in user_income)
+                total_expenses_all = sum(exp.amount for exp in user_expenses)
+                net_income_all = total_income_all - total_expenses_all
+                profit_margin_all = (net_income_all / total_income_all * 100) if total_income_all > 0 else 0
+
+                # Display aggregated P&L Summary section
+                st.markdown("**📊 Profit & Loss Summary (All Organizations)**")
+
+                col_a, col_b, col_c = st.columns(3)
+                with col_a:
+                    st.metric("💰 Total Income", f"${total_income_all:,.2f}")
+                with col_b:
+                    st.metric("💸 Total Expenses", f"${total_expenses_all:,.2f}")
+                with col_c:
+                    delta_text = f"{profit_margin_all:.1f}% margin"
+                    st.metric("📈 Net Income", f"${net_income_all:,.2f}", delta=delta_text)
+
+                # Display "Your Organizations" section
+                st.markdown("**Your Organizations**")
+
+                # Determine which organizations to expand
+                # If only 1 org, expand it. If multiple, expand only the selected one
+                for i, org in enumerate(organizations):
+                    is_expanded = (len(organizations) == 1) or (org.id == selected_org_id)
+
+                    with st.expander(f"🏢 {org.name}", expanded=is_expanded):
+                        # Get organization data
+                        properties = db.get_properties()
+                        org_properties = [p for p in properties if p.organization_id == org.id]
+
+                        # Display basic info
+                        st.markdown(f"**Description:** {org.description or 'No description provided'}")
+                        st.markdown(f"**Created:** {org.created_at.strftime('%Y-%m-%d') if org.created_at else '2025-10-04'}")
+
+                        if org_properties:
+                            # Calculate financial metrics
+                            total_value = sum(p.purchase_price for p in org_properties)
+                            total_rent = sum(p.monthly_rent for p in org_properties)
+
+                            # Get financial data
+                            all_income = db.get_all_income()
+                            all_expenses = db.get_all_expenses()
+
+                            org_income = [inc for inc in all_income if inc.organization_id == org.id]
+                            org_expenses = [exp for exp in all_expenses if exp.organization_id == org.id]
+
+                            total_income = sum(inc.amount for inc in org_income)
+                            total_expenses = sum(exp.amount for exp in org_expenses)
+                            net_income = total_income - total_expenses
+                            profit_margin = (net_income / total_income * 100) if total_income > 0 else 0
+                            roi = (net_income / total_value * 100) if total_value > 0 else 0
+
+                            # Organization Metrics - 3 columns, 3 rows
+                            st.markdown("**📊 Organization Metrics**")
+
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.metric("Properties", len(org_properties))
+                            with col2:
+                                st.metric("Total Value", f"${total_value:,.2f}")
+                            with col3:
+                                st.metric("Monthly Rent", f"${total_rent:,.2f}")
+
+                            col4, col5, col6 = st.columns(3)
+                            with col4:
+                                st.metric("Total Income", f"${total_income:,.2f}")
+                            with col5:
+                                st.metric("Total Expenses", f"${total_expenses:,.2f}")
+                            with col6:
+                                st.metric("Net Income", f"${net_income:,.2f}")
+
+                            col7, col8, col9 = st.columns(3)
+                            with col7:
+                                st.metric("Profit Margin", f"{profit_margin:.1f}%")
+                            with col8:
+                                st.metric("ROI", f"{roi:.1f}%")
+                        else:
+                            st.info("No properties found for this organization")
+
+                # Add New Organization button at bottom - left-aligned, auto-sized
+                if st.button("➕ Add New Organization", type="primary"):
+                    st.session_state.show_add_org = True
+
+                if st.session_state.get('show_add_org', False):
+                    st.markdown("### Add New Organization")
+                    with st.form("add_organization_form"):
+                        org_name = st.text_input("Organization Name", placeholder="Enter organization name")
                         org_description = st.text_area("Description", placeholder="Enter organization description")
-                        
+
                         submitted = st.form_submit_button("Create Organization", type="primary")
-                        
+
                         if submitted and org_name:
                             new_org = Organization(
                                 name=org_name,
                                 description=org_description if org_description else None
                             )
-                            
+
                             result = db.create_organization(new_org, user_id)
                             if result:
                                 st.success(f"Organization '{org_name}' created successfully!")
+                                st.session_state.show_add_org = False
                                 st.rerun()
                             else:
                                 st.error("Failed to create organization. Please try again.")
             else:
-                st.error("Unable to get user ID. Please log out and log back in.")
+                st.info("No organizations found. Create your first organization below.")
+
+                # Create first organization
+                st.markdown("### Create Your First Organization")
+                with st.form("create_first_org_form"):
+                    org_name = st.text_input("Organization Name", placeholder="Enter your organization name")
+                    org_description = st.text_area("Description", placeholder="Enter organization description")
+
+                    submitted = st.form_submit_button("Create Organization", type="primary")
+
+                    if submitted and org_name:
+                        new_org = Organization(
+                            name=org_name,
+                            description=org_description if org_description else None
+                        )
+
+                        result = db.create_organization(new_org, user_id)
+                        if result:
+                            st.success(f"Organization '{org_name}' created successfully!")
+                            st.rerun()
+                        else:
+                            st.error("Failed to create organization. Please try again.")
+        else:
+            st.error("Unable to get user ID. Please log out and log back in.")
 
     elif selected == "Dashboard":
         dashboard.render_dashboard()

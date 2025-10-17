@@ -89,3 +89,6 @@ create_*.py
 # App variants (keep only main app)
 app_*.py
 !app_auth.py
+
+# Claude Code
+.claude/
