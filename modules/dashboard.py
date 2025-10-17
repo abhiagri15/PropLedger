@@ -13,8 +13,6 @@ def render_dashboard():
     """Render the Dashboard page"""
     db = DatabaseOperations()
 
-    st.markdown('<h1 class="main-header">🏠 PropLedger Dashboard</h1>', unsafe_allow_html=True)
-
     # Get data based on authentication mode
     is_demo_mode = False
     if st.session_state.user:

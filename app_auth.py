@@ -166,6 +166,12 @@ st.markdown("""
         font-size: 0.9rem !important;
     }
 
+    /* Reduce sidebar header size */
+    [data-testid="stSidebar"] h1 {
+        font-size: 1.2rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+
     /* Auto-highlight Dashboard on page load */
     .stOptionMenu [data-testid="stOptionMenu"] [role="menuitem"]:nth-child(2) {
         background-color: #02ab21 !important;
