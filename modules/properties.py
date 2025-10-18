@@ -1,6 +1,7 @@
 """
 Properties page for PropLedger
 Extracted from app_auth.py for better maintainability
+Updated: 2025-10-17 - Added date filter and grand totals
 """
 
 import streamlit as st
@@ -34,11 +35,9 @@ def render_properties():
         org = db.get_organization_by_id(selected_org_id)
         org_name = org.name if org else "Unknown Organization"
 
-        st.info(f"Managing properties for: **{org_name}**")
-
         # Real property management with organization filtering
         # Tabs for property management - matching reference design
-        tab1, tab2, tab3 = st.tabs(["View Properties", "Add/Edit Property", "Managing Properties"])
+        tab1, tab2, tab3 = st.tabs(["View Properties", "Add Property", "Managing Properties"])
 
         with tab1:
             all_properties = db.get_properties()
@@ -46,25 +45,98 @@ def render_properties():
             org_properties = [p for p in all_properties if p.organization_id == selected_org_id]
 
             if org_properties:
-                for prop in org_properties:
-                    with st.expander(f"{prop.name} - {prop.address}"):
-                        col1, col2 = st.columns(2)
+                # Filter Controls at the top
+                col1, col2, col3 = st.columns(3)
 
-                        with col1:
-                            st.write(f"**Type:** {prop.property_type.title()}")
-                            st.write(f"**Purchase Price:** ${prop.purchase_price:,.2f}")
-                            st.write(f"**Purchase Date:** {prop.purchase_date.strftime('%Y-%m-%d')}")
-                            st.write(f"**Monthly Rent:** ${prop.monthly_rent:,.2f}")
+                with col1:
+                    # Get unique property names
+                    property_names = ["All Properties"] + sorted(list(set(p.name for p in org_properties)))
+                    selected_property = st.selectbox(
+                        "Filter by Property Name",
+                        property_names,
+                        key="view_property_filter"
+                    )
 
-                        with col2:
-                            financial_summary = db.get_property_financial_summary(prop.id)
-                            st.write(f"**Total Income:** ${financial_summary['total_income']:,.2f}")
-                            st.write(f"**Total Expenses:** ${financial_summary['total_expenses']:,.2f}")
-                            st.write(f"**Net Income:** ${financial_summary['net_income']:,.2f}")
-                            st.write(f"**ROI:** {financial_summary['roi']:.2f}%")
+                with col2:
+                    # Get unique property types
+                    property_types = ["All Types"] + sorted(list(set(p.property_type.title() for p in org_properties)))
+                    selected_type = st.selectbox(
+                        "Filter by Type",
+                        property_types,
+                        key="view_type_filter"
+                    )
 
-                        if prop.description:
-                            st.write(f"**Description:** {prop.description}")
+                with col3:
+                    # Date filter
+                    date_filter = st.selectbox(
+                        "Filter by Date",
+                        ["All Time", "Current Month", "Current Year", "Custom"],
+                        index=1,  # Default to "Current Month"
+                        key="view_date_filter"
+                    )
+
+                # Custom date range inputs (show only if Custom is selected)
+                start_date = None
+                end_date = None
+                if date_filter == "Custom":
+                    st.markdown("**Select Date Range:**")
+                    col_date1, col_date2 = st.columns([1, 1])
+                    with col_date1:
+                        start_date = st.date_input("Start Date", value=date.today().replace(day=1), key="view_start_date")
+                    with col_date2:
+                        end_date = st.date_input("End Date", value=date.today(), key="view_end_date")
+
+                    # Convert to datetime
+                    start_date = datetime.combine(start_date, datetime.min.time())
+                    end_date = datetime.combine(end_date, datetime.max.time())
+
+                elif date_filter == "Current Month":
+                    # First day of current month to today
+                    start_date = datetime.combine(date.today().replace(day=1), datetime.min.time())
+                    end_date = datetime.combine(date.today(), datetime.max.time())
+
+                elif date_filter == "Current Year":
+                    # First day of current year to today
+                    start_date = datetime.combine(date.today().replace(month=1, day=1), datetime.min.time())
+                    end_date = datetime.combine(date.today(), datetime.max.time())
+
+                # Apply filters
+                filtered_properties = org_properties
+
+                if selected_property != "All Properties":
+                    filtered_properties = [p for p in filtered_properties if p.name == selected_property]
+
+                if selected_type != "All Types":
+                    filtered_properties = [p for p in filtered_properties if p.property_type.title() == selected_type]
+
+                st.markdown("---")
+
+                # Create data for table
+                import pandas as pd
+                table_data = []
+
+                for prop in filtered_properties:
+                    # Get financial summary with date filter
+                    financial_summary = db.get_property_financial_summary(prop.id, start_date, end_date)
+
+                    table_data.append({
+                        'Property Name': prop.name,
+                        'Address': prop.address,
+                        'Type': prop.property_type.title(),
+                        'Purchase Price': f"${prop.purchase_price:,.0f}",
+                        'Monthly Rent': f"${prop.monthly_rent:,.0f}",
+                        'Total Income': f"${financial_summary['total_income']:,.0f}",
+                        'Total Expenses': f"${financial_summary['total_expenses']:,.0f}",
+                        'Net Income': f"${financial_summary['net_income']:,.0f}",
+                        'ROI': f"{financial_summary['roi']:.1f}%"
+                    })
+
+                # Display as DataFrame
+                if table_data:
+                    df_properties = pd.DataFrame(table_data)
+                    st.dataframe(df_properties, use_container_width=True, hide_index=True)
+                else:
+                    st.info("No properties match the selected filters.")
             else:
                 st.info(f"No properties found for {org_name}. Add your first property below.")
 
@@ -197,23 +269,14 @@ def render_properties():
                         st.error("Please fill in all required fields.")
 
         with tab3:
-            # Managing Properties tab content - Rich UI matching monolithic design
-            st.markdown("""
-            <div style="background-color: #f0f2f6; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                <h4 style="margin: 0;">🏠 Managing Properties</h4>
-                <p style="margin: 0.5rem 0 0 0; color: #666;">Manage your properties - view details, edit, or delete properties.</p>
-                <p style="margin: 0.25rem 0 0 0; color: #333;"><strong>Found {count} properties for {org}</strong></p>
-            </div>
-            """.format(count=len([p for p in db.get_properties() if p.organization_id == selected_org_id]),
-                      org=org_name), unsafe_allow_html=True)
+            # Managing Properties tab content
+            st.info(f"Found {len([p for p in db.get_properties() if p.organization_id == selected_org_id])} properties for {org_name}")
 
             all_properties = db.get_properties()
             org_properties = [p for p in all_properties if p.organization_id == selected_org_id]
 
             if org_properties:
                 # Filter and Sort Controls
-                st.markdown("### 🔍 Filter Properties")
-
                 col1, col2, col3 = st.columns(3)
 
                 with col1:
@@ -268,47 +331,121 @@ def render_properties():
 
                 st.markdown("---")
 
+                # Add ultra-compact styling CSS
+                st.markdown("""
+                    <style>
+                    .stMarkdown p {
+                        margin-bottom: 0 !important;
+                        margin-top: 0.1rem !important;
+                        line-height: 1.4 !important;
+                    }
+                    div[data-testid="column"] {
+                        padding-top: 0 !important;
+                        padding-bottom: 0 !important;
+                    }
+                    .element-container {
+                        margin-bottom: 0 !important;
+                    }
+                    </style>
+                """, unsafe_allow_html=True)
+
                 # Display properties as cards with financial info
                 for prop in filtered_properties:
                     # Get financial summary for each property
                     financial_summary = db.get_property_financial_summary(prop.id)
 
-                    # Property card with expander - more compact layout
-                    with st.expander(f"🏠 {prop.name}", expanded=False):
-                        # Address and Type on same line
-                        st.markdown(f"**Address:** {prop.address}")
-                        st.markdown(f"**Type:** {prop.property_type.title()}")
+                    # Property card - ultra-compact design
+                    st.markdown(f"<p style='margin: 0.3rem 0 0.1rem 0;'><strong>🏠 {prop.name}</strong></p>", unsafe_allow_html=True)
 
-                        # Monthly Rent and Purchase Price in two columns
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.markdown(f"**Monthly Rent**  \n${prop.monthly_rent:,.0f}")
-                        with col2:
-                            st.markdown(f"**Purchase Price**  \n${prop.purchase_price:,.0f}")
+                    # First row: Address/Type on left, Monthly Rent/Purchase Price on right
+                    info_col1, info_col2 = st.columns([1.5, 1.5])
 
-                        # Financial metrics all on one row - 4 columns
-                        col1, col2, col3, col4 = st.columns(4)
-                        with col1:
-                            st.markdown(f"**Total Income**  \n${financial_summary['total_income']:,.0f}")
-                        with col2:
-                            st.markdown(f"**Total Expenses**  \n${financial_summary['total_expenses']:,.0f}")
-                        with col3:
-                            st.markdown(f"**Net Income**  \n${financial_summary['net_income']:,.0f}")
-                        with col4:
-                            st.markdown(f"**ROI**  \n{financial_summary['roi']:.1f}%")
+                    with info_col1:
+                        st.markdown(f"<p style='margin: 0;'><strong>Address:</strong> {prop.address}</p>", unsafe_allow_html=True)
+                        st.markdown(f"<p style='margin: 0;'><strong>Type:</strong> {prop.property_type.title()}</p>", unsafe_allow_html=True)
 
-                        # Action buttons
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            if st.button(f"✏️ Edit", key=f"manage_edit_{prop.id}", use_container_width=True):
-                                st.session_state[f'editing_{prop.id}'] = True
-                        with col2:
-                            if st.button(f"🗑️ Delete", key=f"manage_delete_{prop.id}", type="secondary", use_container_width=True):
-                                if db.delete_property(prop.id):
-                                    st.success(f"Property '{prop.name}' deleted successfully!")
-                                    st.rerun()
-                                else:
-                                    st.error("Failed to delete property.")
+                    with info_col2:
+                        rent_price_col1, rent_price_col2 = st.columns(2)
+                        with rent_price_col1:
+                            st.markdown("<p style='margin: 0;'><strong>Monthly Rent</strong></p>", unsafe_allow_html=True)
+                            st.markdown(f"<p style='margin: 0;'>${prop.monthly_rent:,.0f}</p>", unsafe_allow_html=True)
+                        with rent_price_col2:
+                            st.markdown("<p style='margin: 0;'><strong>Purchase Price</strong></p>", unsafe_allow_html=True)
+                            st.markdown(f"<p style='margin: 0;'>${prop.purchase_price:,.0f}</p>", unsafe_allow_html=True)
+
+                    # Financial metrics in one row with ultra-compact spacing - 5 columns (4 metrics + profit indicator)
+                    fin_col1, fin_col2, fin_col3, fin_col4, fin_col5 = st.columns([1, 1, 1, 1, 0.5])
+
+                    # Determine profit/loss color based on net income
+                    net_income = financial_summary['net_income']
+                    indicator_color = '#28a745' if net_income >= 0 else '#dc3545'  # Green for profit, Red for loss
+                    roi_value = financial_summary['roi']
+
+                    with fin_col1:
+                        st.markdown("<p style='margin: 0; line-height: 1.2;'><strong>Total Income</strong><br>${:,.0f}</p>".format(financial_summary['total_income']), unsafe_allow_html=True)
+                    with fin_col2:
+                        st.markdown("<p style='margin: 0; line-height: 1.2;'><strong>Total Expenses</strong><br>${:,.0f}</p>".format(financial_summary['total_expenses']), unsafe_allow_html=True)
+                    with fin_col3:
+                        st.markdown("<p style='margin: 0; line-height: 1.2;'><strong>Net Income</strong><br>${:,.0f}</p>".format(net_income), unsafe_allow_html=True)
+                    with fin_col4:
+                        st.markdown("<p style='margin: 0; line-height: 1.2;'><strong>ROI</strong><br>{:.1f}%</p>".format(roi_value), unsafe_allow_html=True)
+                    with fin_col5:
+                        # Mini Bar Chart - Income vs Expenses comparison
+                        total_income = financial_summary['total_income']
+                        total_expenses = financial_summary['total_expenses']
+
+                        # Calculate percentages for bar widths (avoid division by zero)
+                        total = total_income + total_expenses
+                        if total > 0:
+                            income_pct = (total_income / total) * 100
+                            expense_pct = (total_expenses / total) * 100
+                        else:
+                            income_pct = 50
+                            expense_pct = 50
+
+                        # Determine overall status color
+                        status_color = '#28a745' if net_income >= 0 else '#dc3545'
+
+                        # Build HTML without comments
+                        bar_html = f'''<div style="display: flex; flex-direction: column; justify-content: center; height: 100%; padding: 0.2rem;">
+<div style="margin-bottom: 0.15rem;">
+<div style="display: flex; align-items: center;">
+<span style="font-size: 0.65rem; width: 25px; color: #28a745; font-weight: bold;">IN</span>
+<div style="flex: 1; background: #e9ecef; border-radius: 3px; height: 12px; overflow: hidden;">
+<div style="background: #28a745; height: 100%; width: {income_pct}%;"></div>
+</div>
+</div>
+</div>
+<div style="margin-bottom: 0.15rem;">
+<div style="display: flex; align-items: center;">
+<span style="font-size: 0.65rem; width: 25px; color: #dc3545; font-weight: bold;">EX</span>
+<div style="flex: 1; background: #e9ecef; border-radius: 3px; height: 12px; overflow: hidden;">
+<div style="background: #dc3545; height: 100%; width: {expense_pct}%;"></div>
+</div>
+</div>
+</div>
+<div style="text-align: center; margin-top: 0.1rem;">
+<span style="background: {status_color}; color: white; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.7rem; font-weight: bold;">{roi_value:.1f}%</span>
+</div>
+</div>'''
+                        st.markdown(bar_html, unsafe_allow_html=True)
+
+                    # Action buttons - equal size
+                    btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 8])
+                    with btn_col1:
+                        if st.button(f"✏️ Edit", key=f"manage_edit_{prop.id}", use_container_width=True):
+                            st.session_state[f'editing_{prop.id}'] = True
+                            st.rerun()
+                    with btn_col2:
+                        if st.button(f"🗑️ Delete", key=f"manage_delete_{prop.id}", type="secondary", use_container_width=True):
+                            if db.delete_property(prop.id):
+                                st.success(f"Property '{prop.name}' deleted successfully!")
+                                st.rerun()
+                            else:
+                                st.error("Failed to delete property.")
+
+                    # Thin separator between properties
+                    st.markdown("<hr style='margin: 0.5rem 0; border: none; border-top: 1px solid #e0e0e0;'>", unsafe_allow_html=True)
 
                     # Show edit form if editing
                     if st.session_state.get(f'editing_{prop.id}'):
@@ -329,10 +466,28 @@ def render_properties():
                             col1, col2 = st.columns(2)
                             with col1:
                                 if st.form_submit_button("Save Changes", type="primary"):
-                                    # Update property logic here
-                                    st.success("Property updated successfully!")
-                                    st.session_state[f'editing_{prop.id}'] = False
-                                    st.rerun()
+                                    # Create updated property object (only include fields that exist in Property model)
+                                    updated_property = Property(
+                                        id=prop.id,
+                                        name=new_name,
+                                        address=prop.address,  # Address cannot be changed
+                                        property_type=PropertyType(new_type),
+                                        purchase_price=new_price,
+                                        purchase_date=prop.purchase_date,  # Keep original purchase date
+                                        monthly_rent=new_rent,
+                                        description=new_desc if new_desc else None,
+                                        organization_id=prop.organization_id if hasattr(prop, 'organization_id') else None,
+                                        created_at=prop.created_at if hasattr(prop, 'created_at') else None,
+                                        updated_at=prop.updated_at if hasattr(prop, 'updated_at') else None
+                                    )
+
+                                    # Update property in database
+                                    if db.update_property(prop.id, updated_property):
+                                        st.success("Property updated successfully!")
+                                        st.session_state[f'editing_{prop.id}'] = False
+                                        st.rerun()
+                                    else:
+                                        st.error("Failed to update property. Please try again.")
                             with col2:
                                 if st.form_submit_button("Cancel"):
                                     st.session_state[f'editing_{prop.id}'] = False
