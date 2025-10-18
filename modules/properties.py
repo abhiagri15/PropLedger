@@ -141,10 +141,7 @@ def render_properties():
                 st.info(f"No properties found for {org_name}. Add your first property below.")
 
         with tab2:
-            st.subheader("Add New Property")
-
             # Address input section (outside form for suggestions)
-            st.markdown("### Property Details")
 
             # Address search input
             address_search_key = f"address_search_{st.session_state.get('form_reset_counter', 0)}"
@@ -450,7 +447,7 @@ def render_properties():
                     # Show edit form if editing
                     if st.session_state.get(f'editing_{prop.id}'):
                         with st.form(f"edit_form_{prop.id}"):
-                            st.write("### Edit Property Details")
+                            st.markdown("**Edit Property Details**")
                             col1, col2 = st.columns(2)
 
                             with col1:

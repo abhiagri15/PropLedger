@@ -76,8 +76,6 @@ def render_accounting():
         org = db.get_organization_by_id(selected_org_id)
         org_name = org.name if org else "Unknown Organization"
 
-        st.info(f"Tracking income for: **{org_name}**")
-
         # Get properties for this organization (used in both tabs)
         properties = db.get_properties()
         org_properties = [p for p in properties if p.organization_id == selected_org_id]
@@ -126,8 +124,6 @@ def render_accounting():
                                      if (inc.transaction_date.date() if hasattr(inc.transaction_date, 'date') else inc.transaction_date) >= start_date]
 
                 if income_records:
-                    st.info(f"Found {len(income_records)} income transactions")
-
                     # All summary metrics in one line - 4 columns
                     col1, col2, col3, col4 = st.columns(4)
 
@@ -169,8 +165,6 @@ def render_accounting():
 
         with tab2:
             if org_properties:
-                st.subheader("Add New Income Record")
-
                 # Use a key to reset form after successful submission
                 income_form_key = f"add_income_form_{st.session_state.get('income_form_reset_counter', 0)}"
 
@@ -240,35 +234,53 @@ def render_accounting():
 
         with tab3:
             # Manage Income tab
-            st.subheader("Manage Income Records")
+            all_income = db.get_all_income()
+            org_income = [inc for inc in all_income if any(p.id == inc.property_id for p in org_properties)]
 
-            if org_properties:
-                # Filter options with Apply button
-                col1, col2, col3 = st.columns([2, 2, 1])
+            if org_income:
+                # Filter and Sort Controls
+                col1, col2, col3 = st.columns(3)
+
                 with col1:
-                    filter_property = st.selectbox("Filter by Property",
-                                                  ["All"] + [p.name for p in org_properties],
-                                                  key="manage_income_property")
-                with col2:
-                    filter_date = st.selectbox("Date Filter",
-                                              ["Current Month", "Last 3 Months", "Last 6 Months", "This Year", "All Time"],
-                                              key="manage_income_date")
-                with col3:
-                    st.markdown("<br>", unsafe_allow_html=True)  # Add spacing to align button
-                    apply_filter = st.button("Apply Filter", key="manage_income_apply_filter", type="primary")
+                    st.markdown("**Filter by Property**")
+                    filter_property = st.selectbox(
+                        "Filter by Property",
+                        ["All Properties"] + [p.name for p in org_properties],
+                        label_visibility="collapsed",
+                        key="manage_income_property"
+                    )
 
-                # Get income records
-                income_records = db.get_all_income()
+                with col2:
+                    st.markdown("**Filter by Date**")
+                    filter_date = st.selectbox(
+                        "Filter by Date",
+                        ["All Time", "Current Month", "Last 3 Months", "Last 6 Months", "This Year"],
+                        index=1,  # Default to "Current Month"
+                        label_visibility="collapsed",
+                        key="manage_income_date"
+                    )
+
+                with col3:
+                    st.markdown("**Sort by**")
+                    sort_by = st.selectbox(
+                        "Sort by",
+                        ["Date (Newest First)", "Date (Oldest First)", "Amount (High to Low)", "Amount (Low to High)"],
+                        label_visibility="collapsed",
+                        key="manage_income_sort"
+                    )
+
+                # Apply filters
+                filtered_income = org_income
 
                 # Filter by property
-                if filter_property != "All":
-                    income_records = [inc for inc in income_records
-                                    if any(p.name == filter_property and p.id == inc.property_id for p in org_properties)]
+                if filter_property != "All Properties":
+                    filtered_income = [inc for inc in filtered_income
+                                     if any(p.name == filter_property and p.id == inc.property_id for p in org_properties)]
 
                 # Apply date filter
-                if income_records and filter_date != "All Time":
+                if filter_date != "All Time":
                     from datetime import datetime, timedelta
-                    today = datetime.now().date()  # Convert to date for comparison
+                    today = datetime.now().date()
 
                     if filter_date == "Current Month":
                         start_date = today.replace(day=1)
@@ -279,48 +291,79 @@ def render_accounting():
                     elif filter_date == "This Year":
                         start_date = today.replace(month=1, day=1)
 
-                    # Convert transaction_date to date if it's a datetime object
-                    income_records = [inc for inc in income_records
+                    filtered_income = [inc for inc in filtered_income
                                      if (inc.transaction_date.date() if hasattr(inc.transaction_date, 'date') else inc.transaction_date) >= start_date]
 
-                if income_records:
-                    st.info(f"Found {len(income_records)} income records")
+                # Apply sorting
+                if sort_by == "Date (Newest First)":
+                    filtered_income = sorted(filtered_income, key=lambda x: x.transaction_date, reverse=True)
+                elif sort_by == "Date (Oldest First)":
+                    filtered_income = sorted(filtered_income, key=lambda x: x.transaction_date)
+                elif sort_by == "Amount (High to Low)":
+                    filtered_income = sorted(filtered_income, key=lambda x: x.amount, reverse=True)
+                elif sort_by == "Amount (Low to High)":
+                    filtered_income = sorted(filtered_income, key=lambda x: x.amount)
 
-                    # Display records with edit/delete options
-                    for inc in income_records:
-                        prop = next((p for p in org_properties if p.id == inc.property_id), None)
-                        if prop:
-                            with st.expander(f"🔥 {prop.name} - ${inc.amount:,.2f} - {inc.transaction_date.strftime('%Y-%m-%d')}"):
-                                col1, col2, col3 = st.columns([2, 1, 1])
+                st.markdown("---")
 
-                                with col1:
-                                    st.write(f"**Type:** {inc.income_type.title()}")
-                                    st.write(f"**Description:** {inc.description}")
-                                    st.write(f"**Amount:** ${inc.amount:,.2f}")
-                                    st.write(f"**Date:** {inc.transaction_date.strftime('%B %d, %Y')}")
+                # Add ultra-compact styling CSS
+                st.markdown("""
+                    <style>
+                    .stMarkdown p {
+                        margin-bottom: 0 !important;
+                        margin-top: 0.1rem !important;
+                        line-height: 1.4 !important;
+                    }
+                    div[data-testid="column"] {
+                        padding-top: 0 !important;
+                        padding-bottom: 0 !important;
+                    }
+                    .element-container {
+                        margin-bottom: 0 !important;
+                    }
+                    </style>
+                """, unsafe_allow_html=True)
 
-                                with col2:
-                                    if st.button(f"✏️ Edit", key=f"edit_income_{inc.id}"):
-                                        st.session_state[f'editing_income_{inc.id}'] = True
+                # Display income records as compact cards
+                for inc in filtered_income:
+                    prop = next((p for p in org_properties if p.id == inc.property_id), None)
+                    if prop:
+                        # Income card - ultra-compact design
+                        st.markdown(f"<p style='margin: 0.3rem 0 0.1rem 0;'><strong>💰 {prop.name} - ${inc.amount:,.2f}</strong></p>", unsafe_allow_html=True)
 
-                                with col3:
-                                    if st.button(f"🗑️ Delete", key=f"delete_income_{inc.id}", type="secondary"):
-                                        if db.delete_income(inc.id):
-                                            st.success("Income record deleted")
-                                            st.rerun()
-                                        else:
-                                            st.error("Failed to delete income record")
-                else:
-                    st.info("No income records found")
+                        # Transaction details in compact format
+                        info_col1, info_col2 = st.columns([1.5, 1.5])
+
+                        with info_col1:
+                            st.markdown(f"<p style='margin: 0;'><strong>Type:</strong> {inc.income_type.title()}</p>", unsafe_allow_html=True)
+                            st.markdown(f"<p style='margin: 0;'><strong>Description:</strong> {inc.description}</p>", unsafe_allow_html=True)
+
+                        with info_col2:
+                            st.markdown(f"<p style='margin: 0;'><strong>Date:</strong> {inc.transaction_date.strftime('%B %d, %Y')}</p>", unsafe_allow_html=True)
+                            st.markdown(f"<p style='margin: 0;'><strong>Amount:</strong> ${inc.amount:,.2f}</p>", unsafe_allow_html=True)
+
+                        # Action buttons - equal size
+                        btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 8])
+                        with btn_col1:
+                            if st.button(f"✏️ Edit", key=f"manage_edit_income_{inc.id}", use_container_width=True):
+                                st.session_state[f'editing_income_{inc.id}'] = True
+                                st.rerun()
+                        with btn_col2:
+                            if st.button(f"🗑️ Delete", key=f"manage_delete_income_{inc.id}", type="secondary", use_container_width=True):
+                                if db.delete_income(inc.id):
+                                    st.success("Income record deleted successfully!")
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to delete income record.")
+
+                        # Thin separator between income records
+                        st.markdown("<hr style='margin: 0.5rem 0; border: none; border-top: 1px solid #e0e0e0;'>", unsafe_allow_html=True)
             else:
-                st.info(f"No properties found for {org_name}. Please add a property first.")
+                st.info(f"No income records found for {org_name}.")
 
         with tab4:
             # Recurring Income tab
-            st.subheader("Recurring Income Setup")
-
             if org_properties:
-                st.info("Set up recurring income transactions that will be automatically added each month")
 
                 # Add recurring income form
                 with st.form("recurring_income_form"):
@@ -429,8 +472,6 @@ def render_accounting():
         org = db.get_organization_by_id(selected_org_id)
         org_name = org.name if org else "Unknown Organization"
 
-        st.info(f"Tracking expenses for: **{org_name}**")
-
         # Get properties for this organization (used in both tabs)
         properties = db.get_properties()
         org_properties = [p for p in properties if p.organization_id == selected_org_id]
@@ -479,8 +520,6 @@ def render_accounting():
                                       if (exp.transaction_date.date() if hasattr(exp.transaction_date, 'date') else exp.transaction_date) >= start_date]
 
                 if expense_records:
-                    st.info(f"Found {len(expense_records)} expense transactions")
-
                     # All summary metrics in one line - 4 columns
                     col1, col2, col3, col4 = st.columns(4)
 
@@ -522,8 +561,6 @@ def render_accounting():
 
         with exp_tab2:
             if org_properties:
-                st.subheader("Add New Expense Record")
-
                 # Use a key to reset form after successful submission
                 expense_form_key = f"add_expense_form_{st.session_state.get('expense_form_reset_counter', 0)}"
 
@@ -593,35 +630,53 @@ def render_accounting():
 
         with exp_tab3:
             # Manage Expenses tab
-            st.subheader("Manage Expense Records")
+            all_expenses = db.get_all_expenses()
+            org_expenses = [exp for exp in all_expenses if any(p.id == exp.property_id for p in org_properties)]
 
-            if org_properties:
-                # Filter options with Apply button
-                col1, col2, col3 = st.columns([2, 2, 1])
+            if org_expenses:
+                # Filter and Sort Controls
+                col1, col2, col3 = st.columns(3)
+
                 with col1:
-                    filter_property = st.selectbox("Filter by Property",
-                                                  ["All"] + [p.name for p in org_properties],
-                                                  key="manage_expense_property")
-                with col2:
-                    filter_date = st.selectbox("Date Filter",
-                                              ["Current Month", "Last 3 Months", "Last 6 Months", "This Year", "All Time"],
-                                              key="manage_expense_date")
-                with col3:
-                    st.markdown("<br>", unsafe_allow_html=True)  # Add spacing to align button
-                    apply_filter = st.button("Apply Filter", key="manage_expense_apply_filter", type="primary")
+                    st.markdown("**Filter by Property**")
+                    filter_property = st.selectbox(
+                        "Filter by Property",
+                        ["All Properties"] + [p.name for p in org_properties],
+                        label_visibility="collapsed",
+                        key="manage_expense_property"
+                    )
 
-                # Get expense records
-                expense_records = db.get_all_expenses()
+                with col2:
+                    st.markdown("**Filter by Date**")
+                    filter_date = st.selectbox(
+                        "Filter by Date",
+                        ["All Time", "Current Month", "Last 3 Months", "Last 6 Months", "This Year"],
+                        index=1,  # Default to "Current Month"
+                        label_visibility="collapsed",
+                        key="manage_expense_date"
+                    )
+
+                with col3:
+                    st.markdown("**Sort by**")
+                    sort_by = st.selectbox(
+                        "Sort by",
+                        ["Date (Newest First)", "Date (Oldest First)", "Amount (High to Low)", "Amount (Low to High)"],
+                        label_visibility="collapsed",
+                        key="manage_expense_sort"
+                    )
+
+                # Apply filters
+                filtered_expenses = org_expenses
 
                 # Filter by property
-                if filter_property != "All":
-                    expense_records = [exp for exp in expense_records
-                                    if any(p.name == filter_property and p.id == exp.property_id for p in org_properties)]
+                if filter_property != "All Properties":
+                    filtered_expenses = [exp for exp in filtered_expenses
+                                       if any(p.name == filter_property and p.id == exp.property_id for p in org_properties)]
 
                 # Apply date filter
-                if expense_records and filter_date != "All Time":
+                if filter_date != "All Time":
                     from datetime import datetime, timedelta
-                    today = datetime.now().date()  # Convert to date for comparison
+                    today = datetime.now().date()
 
                     if filter_date == "Current Month":
                         start_date = today.replace(day=1)
@@ -632,48 +687,79 @@ def render_accounting():
                     elif filter_date == "This Year":
                         start_date = today.replace(month=1, day=1)
 
-                    # Convert transaction_date to date if it's a datetime object
-                    expense_records = [exp for exp in expense_records
-                                     if (exp.transaction_date.date() if hasattr(exp.transaction_date, 'date') else exp.transaction_date) >= start_date]
+                    filtered_expenses = [exp for exp in filtered_expenses
+                                       if (exp.transaction_date.date() if hasattr(exp.transaction_date, 'date') else exp.transaction_date) >= start_date]
 
-                if expense_records:
-                    st.info(f"Found {len(expense_records)} expense records")
+                # Apply sorting
+                if sort_by == "Date (Newest First)":
+                    filtered_expenses = sorted(filtered_expenses, key=lambda x: x.transaction_date, reverse=True)
+                elif sort_by == "Date (Oldest First)":
+                    filtered_expenses = sorted(filtered_expenses, key=lambda x: x.transaction_date)
+                elif sort_by == "Amount (High to Low)":
+                    filtered_expenses = sorted(filtered_expenses, key=lambda x: x.amount, reverse=True)
+                elif sort_by == "Amount (Low to High)":
+                    filtered_expenses = sorted(filtered_expenses, key=lambda x: x.amount)
 
-                    # Display records with edit/delete options
-                    for exp in expense_records:
-                        prop = next((p for p in org_properties if p.id == exp.property_id), None)
-                        if prop:
-                            with st.expander(f"💸 {prop.name} - ${exp.amount:,.2f} - {exp.transaction_date.strftime('%Y-%m-%d')}"):
-                                col1, col2, col3 = st.columns([2, 1, 1])
+                st.markdown("---")
 
-                                with col1:
-                                    st.write(f"**Type:** {exp.expense_type.title()}")
-                                    st.write(f"**Description:** {exp.description}")
-                                    st.write(f"**Amount:** ${exp.amount:,.2f}")
-                                    st.write(f"**Date:** {exp.transaction_date.strftime('%B %d, %Y')}")
+                # Add ultra-compact styling CSS
+                st.markdown("""
+                    <style>
+                    .stMarkdown p {
+                        margin-bottom: 0 !important;
+                        margin-top: 0.1rem !important;
+                        line-height: 1.4 !important;
+                    }
+                    div[data-testid="column"] {
+                        padding-top: 0 !important;
+                        padding-bottom: 0 !important;
+                    }
+                    .element-container {
+                        margin-bottom: 0 !important;
+                    }
+                    </style>
+                """, unsafe_allow_html=True)
 
-                                with col2:
-                                    if st.button(f"✏️ Edit", key=f"edit_expense_{exp.id}"):
-                                        st.session_state[f'editing_expense_{exp.id}'] = True
+                # Display expense records as compact cards
+                for exp in filtered_expenses:
+                    prop = next((p for p in org_properties if p.id == exp.property_id), None)
+                    if prop:
+                        # Expense card - ultra-compact design
+                        st.markdown(f"<p style='margin: 0.3rem 0 0.1rem 0;'><strong>💸 {prop.name} - ${exp.amount:,.2f}</strong></p>", unsafe_allow_html=True)
 
-                                with col3:
-                                    if st.button(f"🗑️ Delete", key=f"delete_expense_{exp.id}", type="secondary"):
-                                        if db.delete_expense(exp.id):
-                                            st.success("Expense record deleted")
-                                            st.rerun()
-                                        else:
-                                            st.error("Failed to delete expense record")
-                else:
-                    st.info("No expense records found")
+                        # Transaction details in compact format
+                        info_col1, info_col2 = st.columns([1.5, 1.5])
+
+                        with info_col1:
+                            st.markdown(f"<p style='margin: 0;'><strong>Type:</strong> {exp.expense_type.title()}</p>", unsafe_allow_html=True)
+                            st.markdown(f"<p style='margin: 0;'><strong>Description:</strong> {exp.description}</p>", unsafe_allow_html=True)
+
+                        with info_col2:
+                            st.markdown(f"<p style='margin: 0;'><strong>Date:</strong> {exp.transaction_date.strftime('%B %d, %Y')}</p>", unsafe_allow_html=True)
+                            st.markdown(f"<p style='margin: 0;'><strong>Amount:</strong> ${exp.amount:,.2f}</p>", unsafe_allow_html=True)
+
+                        # Action buttons - equal size
+                        btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 8])
+                        with btn_col1:
+                            if st.button(f"✏️ Edit", key=f"manage_edit_expense_{exp.id}", use_container_width=True):
+                                st.session_state[f'editing_expense_{exp.id}'] = True
+                                st.rerun()
+                        with btn_col2:
+                            if st.button(f"🗑️ Delete", key=f"manage_delete_expense_{exp.id}", type="secondary", use_container_width=True):
+                                if db.delete_expense(exp.id):
+                                    st.success("Expense record deleted successfully!")
+                                    st.rerun()
+                                else:
+                                    st.error("Failed to delete expense record.")
+
+                        # Thin separator between expense records
+                        st.markdown("<hr style='margin: 0.5rem 0; border: none; border-top: 1px solid #e0e0e0;'>", unsafe_allow_html=True)
             else:
-                st.info(f"No properties found for {org_name}. Please add a property first.")
+                st.info(f"No expense records found for {org_name}.")
 
         with exp_tab4:
             # Recurring Expense tab
-            st.subheader("Recurring Expense Setup")
-
             if org_properties:
-                st.info("Set up recurring expense transactions that will be automatically added each month")
 
                 # Add recurring expense form
                 with st.form("recurring_expense_form"):
